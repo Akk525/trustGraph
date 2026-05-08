@@ -1,0 +1,3 @@
+[submodule "examples/vulnerable-crosschain/lib/forge-std"]
+	path = examples/vulnerable-crosschain/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std

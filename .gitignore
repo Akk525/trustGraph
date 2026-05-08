@@ -1,0 +1,25 @@
+# Python
+.env
+*.env
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# TrustGraph output (generated reports and exploit tests)
+trustgraph-output*/
+.trustgraph/
+
+# Node / VS Code extension build
+node_modules/
+vscode-extension/out/
+vscode-extension/node_modules/
+
+# Example project build artefacts
+examples/vulnerable-crosschain/out/
+examples/vulnerable-crosschain/cache/
+
+docs/
+FINAL_DEMO.md

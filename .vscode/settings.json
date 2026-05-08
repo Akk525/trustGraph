@@ -1,0 +1,6 @@
+{
+  "trustgraph.cliPath": "/Users/akk/.pyenv/versions/3.12.4/bin/trustgraph",
+  "trustgraph.contractPath": "examples/vulnerable-crosschain/src",
+  "trustgraph.outputDir": ".trustgraph",
+  "trustgraph.runFoundry": true
+}

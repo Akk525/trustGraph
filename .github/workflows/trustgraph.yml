@@ -1,0 +1,75 @@
+name: TrustGraph CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit:
+    name: Audit example contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install TrustGraph
+        run: pip install -e .
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install forge-std
+        run: |
+          cd examples/vulnerable-crosschain
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Run TrustGraph audit (markdown report)
+        run: |
+          trustgraph audit examples/vulnerable-crosschain/src \
+            --generate-test \
+            --report-format markdown \
+            --output-dir trustgraph-output
+
+      - name: Run TrustGraph audit with Foundry (both formats)
+        run: |
+          trustgraph audit examples/vulnerable-crosschain/src \
+            --generate-test \
+            --run-foundry \
+            --report-format both \
+            --output-dir trustgraph-output-full
+
+      - name: Upload markdown report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trustgraph-report
+          path: |
+            trustgraph-output/
+            trustgraph-output-full/
+          if-no-files-found: warn
+
+      - name: Assert critical finding detected
+        run: |
+          python - <<'EOF'
+          import json, sys
+          with open("trustgraph-output-full/report.json") as f:
+              report = json.load(f)
+          critical = [x for x in report["findings"] if x["severity"] == "Critical"]
+          if not critical:
+              print("FAIL: no Critical findings detected", file=sys.stderr)
+              sys.exit(1)
+          names = [x["function"] for x in critical]
+          if "receiveMessage" not in names:
+              print(f"FAIL: expected receiveMessage in critical findings, got {names}", file=sys.stderr)
+              sys.exit(1)
+          print(f"OK: {len(critical)} Critical finding(s): {names}")
+          EOF

@@ -1,0 +1,175 @@
+{
+  "name": "trustgraph",
+  "displayName": "TrustGraph",
+  "description": "Detect CrossCurve-style trust-boundary vulnerabilities in Solidity smart contracts.",
+  "version": "0.1.0",
+  "publisher": "trustgraph",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:solidity",
+    "workspaceContains:**/*.sol",
+    "onView:trustgraph.findings"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "trustgraph.runAudit",
+        "title": "TrustGraph: Run Audit",
+        "icon": "$(play)"
+      },
+      {
+        "command": "trustgraph.openFindings",
+        "title": "Open Detail",
+        "category": "TrustGraph"
+      },
+      {
+        "command": "trustgraph.goToSource",
+        "title": "Go to Source",
+        "category": "TrustGraph",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "trustgraph.copyPatch",
+        "title": "Copy Patch",
+        "category": "TrustGraph",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "trustgraph.openReport",
+        "title": "Open Report File",
+        "category": "TrustGraph"
+      },
+      {
+        "command": "trustgraph.openExploitTest",
+        "title": "Open Exploit Test",
+        "category": "TrustGraph",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "trustgraph.clearFindings",
+        "title": "TrustGraph: Clear Findings",
+        "icon": "$(clear-all)"
+      }
+    ],
+    "configuration": {
+      "title": "TrustGraph",
+      "properties": {
+        "trustgraph.contractPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to a .sol file or directory of Solidity source files. Defaults to workspace root."
+        },
+        "trustgraph.outputDir": {
+          "type": "string",
+          "default": ".trustgraph",
+          "description": "Directory for reports and generated tests (relative to workspace root, or absolute). Default is hidden .trustgraph/ folder."
+        },
+        "trustgraph.runFoundry": {
+          "type": "boolean",
+          "default": false,
+          "description": "Execute `forge test` after generating exploit tests."
+        },
+        "trustgraph.generateTest": {
+          "type": "boolean",
+          "default": true,
+          "description": "Generate Foundry exploit PoC tests."
+        },
+        "trustgraph.reportFormat": {
+          "type": "string",
+          "enum": [
+            "markdown",
+            "json",
+            "both"
+          ],
+          "default": "both",
+          "description": "Report output format."
+        },
+        "trustgraph.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Full path to the trustgraph CLI binary. Leave empty to use PATH lookup."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "trustgraph",
+          "title": "TrustGraph",
+          "icon": "media/trustgraph-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "trustgraph": [
+        {
+          "id": "trustgraph.findings",
+          "name": "Findings"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "trustgraph.runAudit",
+          "when": "view == trustgraph.findings",
+          "group": "navigation@1"
+        },
+        {
+          "command": "trustgraph.clearFindings",
+          "when": "view == trustgraph.findings",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "trustgraph.openFindings",
+          "when": "viewItem =~ /^trustgraphFinding/",
+          "group": "1_detail@1"
+        },
+        {
+          "command": "trustgraph.goToSource",
+          "when": "viewItem =~ /^trustgraphFinding/",
+          "group": "1_detail@2"
+        },
+        {
+          "command": "trustgraph.openExploitTest",
+          "when": "viewItem =~ /exploit/",
+          "group": "2_test@1"
+        },
+        {
+          "command": "trustgraph.copyPatch",
+          "when": "viewItem =~ /patch/",
+          "group": "2_test@2"
+        },
+        {
+          "command": "trustgraph.goToSource",
+          "when": "viewItem =~ /^trustgraphFinding/",
+          "group": "inline@1"
+        },
+        {
+          "command": "trustgraph.openExploitTest",
+          "when": "viewItem =~ /exploit/",
+          "group": "inline@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.118.0",
+    "@vscode/test-electron": "^2.5.2",
+    "typescript": "^5.3.0"
+  }
+}
