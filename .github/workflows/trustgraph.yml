@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -27,11 +29,6 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-
-      - name: Install forge-std
-        run: |
-          cd examples/vulnerable-crosschain
-          forge install foundry-rs/forge-std --no-commit
 
       - name: Run TrustGraph audit (markdown report)
         run: |
