@@ -1,298 +1,337 @@
-TrustGraph
+# TrustGraph
 
-TrustGraph is a trust-boundary vulnerability analysis workflow for Solidity smart contracts.
+**Deterministic trust-boundary vulnerability analysis for Solidity smart contracts.**
 
-It detects externally callable functions that implicitly trust unverified callers, generates executable Foundry exploit proofs, and surfaces findings through a VS Code investigation workflow.
+TrustGraph detects externally callable functions that implicitly trust unverified callers, generates executable Foundry exploit proofs, and surfaces findings through a VS Code investigation workflow.
 
-TrustGraph is deterministic-first: heuristic analysis is the sole source of truth for vulnerability severity. Optional Gemini 2.5 Flash reasoning enriches trust-assumption explanations but never overrides deterministic findings.
+Detection is **deterministic-first** — heuristic analysis is the sole source of truth for severity. Optional Gemini 2.5 Flash reasoning enriches trust-assumption explanations but never overrides deterministic findings.
 
-⸻
+> Experimental research prototype. Not a substitute for professional smart contract audits.
 
-Features
+---
 
-* Deterministic-first trust-boundary analysis
-* Cross-chain receiver vulnerability detection
-* Auto-generated Foundry exploit PoCs
-* Optional Gemini-powered semantic reasoning
-* Markdown + JSON report generation
-* VS Code diagnostics and investigation workflow
-* GitHub Actions CI/CD integration
+## Features
 
-⸻
+- Deterministic trust-boundary analysis (no LLM required for detection)
+- Cross-chain receiver vulnerability detection
+- Auto-generated Foundry exploit PoCs, executed by `forge test`
+- Optional Gemini-powered semantic reasoning
+- Markdown + JSON report generation
+- VS Code investigation workflow with diagnostics, findings navigation, exploit validation, and remediation guidance
+- GitHub Actions CI/CD integration
 
-Install
+---
 
+## Install
+
+```bash
 git clone https://github.com/your-org/trustgraph
 cd trustgraph
 pip install -e .
+```
 
-Optional Gemini reasoning
+**With optional Gemini reasoning:**
 
+```bash
 pip install -e ".[gemini]"
 export GEMINI_API_KEY="your_key_here"
-export GEMINI_MODEL="gemini-2.5-flash"
+export GEMINI_MODEL="gemini-2.5-flash"   # optional, this is the default
+```
 
-Without a Gemini API key, TrustGraph automatically falls back to deterministic-only analysis.
+Without a Gemini API key, TrustGraph falls back to deterministic-only analysis automatically. You can also store keys in a local `.env` file (gitignored by default):
 
-You can also store environment variables in a local .env file:
-
+```
 GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.5-flash
+```
 
-.env is ignored by git by default.
+---
 
-⸻
+## Usage
 
-Usage
-
-Basic audit
-
+```bash
+# Basic audit
 trustgraph audit path/to/contracts/src
 
-Generate exploit PoC tests
-
+# Generate Foundry exploit PoC tests
 trustgraph audit path/to/src --generate-test
 
-Execute generated Foundry tests
+# Generate tests + run forge test
+trustgraph audit path/to/src --generate-test --run-foundry
 
-trustgraph audit path/to/src \
-  --generate-test \
-  --run-foundry
+# Markdown + JSON reports
+trustgraph audit path/to/src --report-format both
 
-Generate Markdown + JSON reports
-
-trustgraph audit path/to/src \
-  --report-format both
-
-Deterministic-only mode
-
+# Deterministic-only mode (no LLM calls)
 trustgraph audit path/to/src --no-ai
+```
 
-⸻
+**All options:**
 
-VS Code Extension
+```
+Arguments:
+  PATH                    .sol file or directory  [required]
 
-TrustGraph ships with a local VS Code extension for interactive investigation workflows.
+Options:
+  --generate-test / --no-generate-test   Generate Foundry exploit PoC  [default: generate-test]
+  --run-foundry / --no-run-foundry       Execute forge test             [default: no-run-foundry]
+  --report-format TEXT                   markdown | json | both         [default: markdown]
+  --output-dir TEXT                      Output directory               [default: trustgraph-output]
+  --no-ai                                Disable LLM calls
+```
 
-Features include:
+---
 
-* inline diagnostics
-* findings sidebar
-* exploit test navigation
-* patch copying
-* Foundry result rendering
-* trust-assumption inspection
+## Demo
 
-Run locally
+```bash
+# Run the full pipeline against the bundled example
+trustgraph audit examples/vulnerable-crosschain/src \
+  --generate-test \
+  --run-foundry \
+  --report-format both \
+  --output-dir .trustgraph
+```
 
+Expected terminal output:
+
+```
+Critical → receiveMessage   VulnerableReceiver.sol:27
+Medium   → mint             MockToken.sol:18
+
+[PASS] test_directInvocationExploit() (gas: 67996)
+```
+
+Generated outputs:
+
+```
+.trustgraph/
+├── report.md
+├── report.json
+└── tests/
+    └── VulnerableReceiverExploit.t.sol
+```
+
+### Demo Video
+
+[Watch Demo Video](https://example.com/trustgraph-demo)
+
+### Findings Sidebar
+
+TrustGraph surfaces findings directly inside VS Code through a severity-grouped investigation sidebar.
+
+![Findings Sidebar](screenshots/findings-sidebar.png)
+
+### Critical Finding Investigation
+
+Each finding expands into a full investigation panel containing deterministic evidence, trust assumptions, Gemini reasoning, remediation guidance, and executable Foundry validation results.
+
+![Critical Finding Panel](screenshots/critical-finding-panel.png)
+
+### Generated Exploit Proof
+
+TrustGraph generates executable Foundry exploit proofs for vulnerable trust-boundary flows.
+
+![Exploit Test](screenshots/exploit-test.png)
+
+---
+
+## VS Code Investigation Workflow
+
+TrustGraph ships with a local VS Code extension for interactive investigation.
+
+**Setup:**
+
+```bash
 cd vscode-extension
 npm install
 npm run compile
+```
 
-Then:
+1. Open `vscode-extension/` in VS Code and press **F5** to launch the Extension Development Host.
+2. Open the main TrustGraph repo in the new window.
+3. Run `TrustGraph: Run Audit` from the Command Palette.
 
-1. Open vscode-extension/ in VS Code
-2. Press F5
-3. Open the main TrustGraph repo in the Extension Development Host
-4. Run:
+**Recommended `.vscode/settings.json`:**
 
-TrustGraph: Run Audit
-
-Recommended extension settings
-
+```json
 {
   "trustgraph.cliPath": "/path/to/trustgraph",
   "trustgraph.contractPath": "examples/vulnerable-crosschain/src",
   "trustgraph.outputDir": ".trustgraph",
   "trustgraph.runFoundry": true
 }
+```
 
-Generated reports and exploit tests are written into:
+Reports and exploit tests are written to `.trustgraph/` (gitignored).
 
-.trustgraph/
+**Extension features:**
 
-⸻
+| Feature | Description |
+|---|---|
+| Inline diagnostics | Red/yellow squiggles on vulnerable functions |
+| Findings sidebar | Severity-grouped tree with scan summary |
+| Detail webview | Evidence, trust assumption, AI analysis, Foundry result, patch |
+| Go to Source | Jump to the exact finding line |
+| Open Exploit Test | Open the generated `.t.sol` |
+| Copy Patch | Copy the recommended fix to clipboard |
 
-Demo
+---
 
-# Install forge-std once
-cd examples/vulnerable-crosschain
-forge install foundry-rs/forge-std --no-commit
-cd ../..
-# Run TrustGraph
-trustgraph audit examples/vulnerable-crosschain/src \
-  --generate-test \
-  --run-foundry \
-  --report-format both
+## Why CrossCurve-style bugs matter
 
-Expected result:
+In August 2024, the CrossCurve bridge was drained for ~$5M. The root cause: a cross-chain receiver function accepted arbitrary payloads from **any caller**, not just the trusted bridge endpoint. The attacker called it directly with a forged payload, bypassing the bridge entirely.
 
-Critical → receiveMessage
-Medium   → mint
+This pattern — an implicit trust assumption with no on-chain enforcement — recurs across LayerZero receivers, Axelar gateways, and custom bridge integrations.
 
-Generated outputs:
+---
 
-.trustgraph/
-├── report.md
-├── report.json
-└── tests/
+## Vulnerability Predicate
 
-⸻
+```
+Vulnerable(f) = E(f) ∧ P(f) ∧ V(f) ∧ ¬G(f)
+```
 
-Why CrossCurve-style bugs matter
+| Predicate | Meaning | Detection |
+|---|---|---|
+| `E(f)` | `external` or `public` visibility | Regex on signature |
+| `P(f)` | Accepts attacker-controlled payload | `bytes calldata`, `abi.decode`, `payload`/`data`/`message` params |
+| `V(f)` | Critical state mutation | `.mint(`, `.transfer(`, `.withdraw(`, `balances[` |
+| `G(f)` | Caller guard present | `require(msg.sender ==`, `onlyOwner`, `trustedBridge`, sig verification |
 
-CrossCurve-style exploits occur when contracts implicitly trust an external bridge/router caller without enforcing that assumption on-chain.
+**Severity assignment:**
 
-An attacker can directly invoke the receiver with forged payloads, bypassing the bridge entirely and triggering privileged state changes such as token minting or withdrawals.
+| Score | Severity |
+|---|---|
+| E + P + V + no guard | **Critical** |
+| E + V + no guard | **Medium** |
+| Otherwise | Informational |
 
-TrustGraph focuses specifically on this trust-boundary failure pattern.
+---
 
-⸻
+## Architecture
 
-Vulnerability Predicate
-
-Vulnerable(f) = E(f) AND P(f) AND V(f) AND NOT G(f)
-
-Predicate	Meaning
-E(f)	Function is external or public
-P(f)	Accepts attacker-controlled payloads
-V(f)	Performs critical state mutation
-G(f)	Enforces caller validation or access control
-
-Severity
-
-Condition	Severity
-E + P + V + no guard	Critical
-E + V + no guard	Medium
-Otherwise	Informational
-
-⸻
-
-Architecture
-
+```
 VS Code Extension
-        ↓
-TrustGraph CLI
-        ↓
-LangGraph workflow
-        ↓
-Deterministic analysis
-        ↓
-Optional Gemini reasoning
-        ↓
-Exploit generation
-        ↓
-Foundry validation
-
-Project structure
-
-trustgraph/
-├── cli.py
-├── graph.py
-├── models.py
-├── scanners/
-├── agents/
-├── runners/
-└── reports/
-
-LangGraph workflow
-
+      ↓  subprocess
+TrustGraph CLI (Typer)
+      ↓
+LangGraph StateGraph
+      ↓
 load_contracts
-    ↓
-static_scan
-    ↓
-infer_trust_assumptions
-    ↓
-validate_guards
-    ↓
-generate_exploit_tests
-    ↓
-run_foundry_tests
-    ↓
-recommend_patches
-    ↓
-generate_report
+      ↓
+static_scan              ← E/P/V/G heuristic scoring
+      ↓
+infer_trust_assumptions  ← deterministic + optional Gemini
+      ↓
+validate_guards          ← confirm guard absence
+      ↓
+generate_exploit_tests   ← Foundry PoC templating
+      ↓
+run_foundry_tests        ← forge test subprocess
+      ↓
+recommend_patches        ← deterministic templates
+      ↓
+generate_report          ← JSON + Markdown
+```
 
-⸻
+**Project layout:**
 
-Deterministic-first design
+```
+trustgraph/
+├── cli.py              — Typer CLI entry point
+├── graph.py            — LangGraph StateGraph (8 nodes)
+├── models.py           — Pydantic models + WorkflowState
+├── scanners/
+│   └── solidity.py     — Regex function extractor + heuristic scorer
+├── agents/
+│   ├── trust_assumption.py   — Deterministic classifier + Gemini reasoning
+│   ├── exploit_generator.py  — Foundry PoC template engine
+│   └── patch_recommender.py  — Patch suggestion templates
+├── runners/
+│   └── foundry.py      — forge test subprocess runner
+└── reports/
+    ├── markdown.py     — Markdown report generator
+    └── json_report.py  — JSON report generator
+```
+
+---
+
+## Deterministic-first design
 
 TrustGraph does not rely on LLMs for vulnerability decisions.
 
-The deterministic scanner is the sole source of truth for:
+**The deterministic scanner is the sole source of truth for:**
+- exposure detection (E)
+- payload detection (P)
+- critical state mutation detection (V)
+- access-control / guard detection (G)
+- severity assignment (Critical / Medium / Informational)
 
-* exposure detection
-* payload detection
-* critical state mutation detection
-* access-control validation
-* severity assignment
+**Gemini is used only for:**
+- semantic trust-assumption explanation
+- auditor-readable natural-language reasoning
 
-Gemini is used only for:
+If the AI layer fails or is disabled, TrustGraph still detects findings, generates exploit PoCs, runs Foundry proofs, and produces remediation guidance.
 
-* semantic trust-assumption explanation
-* auditor-readable reasoning
-* natural-language summaries
+**Gemini fallback behaviour:**
 
-If the AI layer fails or is disabled, TrustGraph still:
+| Condition | Behaviour | `llm_status` |
+|---|---|---|
+| `--no-ai` passed | Deterministic only | `no_ai_forced` |
+| No API key | Deterministic fallback | `missing_api_key_fallback` |
+| Gemini API error / quota | Deterministic fallback | `gemini_error_fallback` |
+| Invalid Gemini response | Deterministic fallback | `failed_parse_fallback` |
+| Gemini success | Enriched reasoning | `gemini_success` |
 
-* detects findings
-* generates exploit PoCs
-* runs Foundry proofs
-* produces remediation guidance
+---
 
-Gemini fallback behaviour
+## CI/CD
 
-Condition	Behaviour
---no-ai	deterministic only
-missing API key	deterministic fallback
-Gemini API failure	deterministic fallback
-invalid Gemini response	deterministic fallback
-Gemini success	enriched reasoning
+TrustGraph includes a GitHub Actions workflow (`.github/workflows/trustgraph.yml`) that:
 
-⸻
+1. Checks out the repo with submodules (forge-std)
+2. Installs TrustGraph and Foundry
+3. Runs the audit against the bundled example contracts
+4. Asserts a Critical `receiveMessage` finding is detected
+5. Uploads reports as build artifacts
 
-CI/CD
+---
 
-TrustGraph includes a GitHub Actions workflow that:
+## Limitations
 
-1. installs TrustGraph + Foundry
-2. audits the example contracts
-3. asserts a Critical finding exists
-4. uploads reports as artifacts
+- Heuristic keyword matching — may miss custom patterns or produce false positives on unusual code.
+- No cross-function taint tracking — a guard in a calling function is not detected.
+- No inheritance resolution — modifiers defined in a parent contract are not traced.
+- Single-file scope — multi-file data flows are not traced.
 
-This enables merge-gating for unguarded receiver patterns.
+---
 
-⸻
+## Future Work
 
-Limitations
+- AST-level parsing via `solc --ast-compact-json`
+- Cross-function and cross-contract call graph analysis
+- Slither integration for complementary symbolic analysis
+- Confidence-gated AI severity escalation with human confirmation
+- Semgrep rule export from confirmed findings
 
-* Heuristic-based matching may miss custom patterns or produce false positives.
-* No cross-function taint tracking.
-* No inheritance-aware modifier resolution.
-* Multi-file data flow is not fully traced.
+---
 
-⸻
+## Security Disclaimer
 
-Future Work
+TrustGraph is an experimental research prototype. It has not itself been security-audited.
 
-* AST-level parsing via solc --ast-compact-json
-* Project-level call graph analysis
-* Cross-function taint tracking
-* Slither integration for complementary analysis
-* Vulnerability-class-specific exploit templates
-* Confidence-gated AI explanations and auditor guidance
-* Semgrep rule export
+AI-generated explanations are informational only. The Foundry exploit proof confirms exploitability of the generated test case — it does not guarantee the absence of other attack paths. All findings require human review before drawing production conclusions.
 
-⸻
+---
 
-Security Disclaimer
+## Acknowledgements
 
-TrustGraph is an experimental research prototype and should not be treated as a substitute for professional smart contract audits.
+Inspired by the August 2024 CrossCurve bridge exploit and the broader class of trust-boundary failures in cross-chain bridge receiver architectures.
 
-AI-generated explanations are informational only and should not be treated as ground truth. All findings and exploit proofs require human review.
+## References
 
-⸻
-
-Acknowledgements
-
-Inspired by the August 2024 CrossCurve bridge exploit and related trust-boundary failures in bridge receiver architectures.
+- Feist et al. *Slither: A Static Analysis Framework for Smart Contracts* (2019)
+- Tsankov et al. *Securify: Practical Security Analysis of Smart Contracts* (2018)
+- Tikhomirov et al. *SmartCheck: Static Analysis of Ethereum Smart Contracts* (2018)
+- ConsenSys Diligence. *Mythril Classic*
+- Semgrep: https://semgrep.dev
