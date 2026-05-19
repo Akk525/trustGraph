@@ -1,19 +1,45 @@
 {
   "name": "trustgraph",
   "displayName": "TrustGraph",
-  "description": "Detect CrossCurve-style trust-boundary vulnerabilities in Solidity smart contracts.",
+  "description": "Deterministic Solidity trust-boundary analysis with reproducible Foundry proof tests.",
   "version": "0.1.0",
-  "publisher": "trustgraph",
+  "publisher": "akk525",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Akk525/trustGraph"
+  },
+  "bugs": {
+    "url": "https://github.com/Akk525/trustGraph/issues"
+  },
+  "homepage": "https://github.com/Akk525/trustGraph#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
+    "Linters",
+    "Testing",
     "Other"
+  ],
+  "icon": "media/trustgraph-icon.png",
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  },
+  "keywords": [
+    "solidity",
+    "smart-contract-security",
+    "foundry",
+    "static-analysis",
+    "ethereum",
+    "defi-security",
+    "vscode-extension",
+    "developer-tooling",
+    "smart-contracts"
   ],
   "activationEvents": [
     "onLanguage:solidity",
-    "workspaceContains:**/*.sol",
-    "onView:trustgraph.findings"
+    "workspaceContains:**/*.sol"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -46,8 +72,8 @@
         "category": "TrustGraph"
       },
       {
-        "command": "trustgraph.openExploitTest",
-        "title": "Open Exploit Test",
+        "command": "trustgraph.openProofTest",
+        "title": "Open Proof Test",
         "category": "TrustGraph",
         "icon": "$(beaker)"
       },
@@ -68,17 +94,17 @@
         "trustgraph.outputDir": {
           "type": "string",
           "default": ".trustgraph",
-          "description": "Directory for reports and generated tests (relative to workspace root, or absolute). Default is hidden .trustgraph/ folder."
+          "description": "Directory for reports and generated tests (relative to workspace root or absolute)."
         },
         "trustgraph.runFoundry": {
           "type": "boolean",
           "default": false,
-          "description": "Execute `forge test` after generating exploit tests."
+          "description": "Execute forge test after generating proof tests."
         },
         "trustgraph.generateTest": {
           "type": "boolean",
           "default": true,
-          "description": "Generate Foundry exploit PoC tests."
+          "description": "Generate Foundry proof tests for trust-boundary findings."
         },
         "trustgraph.reportFormat": {
           "type": "string",
@@ -139,36 +165,29 @@
           "group": "1_detail@2"
         },
         {
-          "command": "trustgraph.openExploitTest",
-          "when": "viewItem =~ /exploit/",
+          "command": "trustgraph.openProofTest",
+          "when": "viewItem =~ /proofTest/",
           "group": "2_test@1"
         },
         {
           "command": "trustgraph.copyPatch",
           "when": "viewItem =~ /patch/",
           "group": "2_test@2"
-        },
-        {
-          "command": "trustgraph.goToSource",
-          "when": "viewItem =~ /^trustgraphFinding/",
-          "group": "inline@1"
-        },
-        {
-          "command": "trustgraph.openExploitTest",
-          "when": "viewItem =~ /exploit/",
-          "group": "inline@2"
         }
       ]
     }
   },
   "scripts": {
+    "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "prepackage": "npm run compile && node scripts/check-package-safety.js",
+    "package": "npx @vscode/vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/vscode": "^1.118.0",
+    "@types/vscode": "^1.85.0",
     "@vscode/test-electron": "^2.5.2",
     "typescript": "^5.3.0"
   }

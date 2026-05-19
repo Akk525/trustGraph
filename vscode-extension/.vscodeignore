@@ -1,0 +1,62 @@
+# TypeScript source — compiled output is in out/
+src/
+tsconfig.json
+
+# Dev tooling
+.vscode/
+.eslintrc*
+.eslintignore
+
+# Node
+node_modules/
+
+# Git
+.git/
+.gitignore
+.gitmodules
+.gitattributes
+
+# Build / test artifacts
+.vscode-test/
+coverage/
+*.vsix
+
+# Internal docs — not part of the published extension
+PUBLISHING.md
+CONTRIBUTING.md
+ARCHITECTURE.md
+FINAL_DEMO.md
+
+# Source maps — strip from release package to reduce size
+out/**/*.map
+
+# Python / CLI tool files (if any leaked to this directory)
+*.py
+__pycache__/
+.python-version
+.env
+.env.*
+*.local
+
+# Claude Code
+.claude/
+
+# Dev scripts (pre-package tooling, not part of extension)
+scripts/
+
+# Generated / local output
+.trustgraph/
+trustgraph-output/
+
+# OS artefacts
+.DS_Store
+**/.DS_Store
+
+# Local recordings and raw assets
+recordings/
+raw-assets/
+
+# Scratch / draft docs
+screenshots-checklist.md
+demo-script.md
+architecture-summary.md

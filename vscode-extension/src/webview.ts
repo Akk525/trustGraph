@@ -156,7 +156,7 @@ function buildTrustAssumption(f: Finding): string {
 
   const rows: [string, string][] = [
     ['Assumed Caller',     ta.assumed_trusted_caller],
-    ['Attack Vector',      ta.attack_vector],
+    ['Unsafe Trust Path',  ta.attack_vector],
     ...(ta.implicit_assumption  ? [['Implicit Assumption',  ta.implicit_assumption]  as [string, string]] : []),
     ...(ta.missing_enforcement  ? [['Missing Enforcement',  ta.missing_enforcement]  as [string, string]] : []),
   ];
@@ -250,13 +250,13 @@ function buildPatch(f: Finding): string {
 }
 
 function buildActions(f: Finding): string {
-  const exploitBtn = f.exploit_path
-    ? `<button class="btn-secondary" data-action="openExploit">${ico('bug')} Open Exploit Test</button>`
+  const proofTestBtn = f.proofTestPath
+    ? `<button class="btn-secondary" data-action="openProofTest">${ico('bug')} Open Proof Test</button>`
     : '';
 
   return `<div class="actions">
   <button class="btn-primary" data-action="openFile">${ico('file')} Go to Source</button>
-  ${exploitBtn}
+  ${proofTestBtn}
 </div>`;
 }
 
@@ -345,10 +345,10 @@ export class FindingDetailPanel {
       vscode.env.clipboard.writeText(f.patch.code_snippet);
       vscode.window.showInformationMessage('Patch copied to clipboard.');
 
-    } else if (msg.command === 'openExploit' && f.exploit_path) {
-      const filePath = resolve(f.exploit_path);
+    } else if (msg.command === 'openProofTest' && f.proofTestPath) {
+      const filePath = resolve(f.proofTestPath);
       if (!filePath || !fs.existsSync(filePath)) {
-        vscode.window.showWarningMessage(`TrustGraph: Exploit test file not found — ${filePath}`);
+        vscode.window.showWarningMessage(`TrustGraph: Proof test file not found — ${filePath}`);
         return;
       }
       vscode.window.showTextDocument(vscode.Uri.file(filePath));

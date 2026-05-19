@@ -31,7 +31,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('trustgraph.goToSource',      goToSourceCommand),
     vscode.commands.registerCommand('trustgraph.copyPatch',       copyPatchCommand),
     vscode.commands.registerCommand('trustgraph.openReport',      openReportCommand),
-    vscode.commands.registerCommand('trustgraph.openExploitTest', openExploitTestCommand),
+    vscode.commands.registerCommand('trustgraph.openProofTest', openProofTestCommand),
     vscode.commands.registerCommand('trustgraph.clearFindings',   clearFindingsCommand),
   );
 }
@@ -55,7 +55,7 @@ function unwrapFinding(arg: unknown): Finding | undefined {
   if (maybeItem.finding) { return maybeItem.finding; }
   // Plain Finding (called programmatically or passed via arguments array)
   const maybeFinding = arg as Finding;
-  if (maybeFinding.file || maybeFinding.function || maybeFinding.exploit_path) {
+  if (maybeFinding.file || maybeFinding.function || maybeFinding.proofTestPath) {
     return maybeFinding;
   }
   return undefined;
@@ -96,12 +96,12 @@ function resolveAndCheck(
   return resolved;
 }
 
-// Resolve file/exploit_path to absolute paths at report-load time.
+// Resolve file/proof-test path to absolute paths at report-load time.
 function resolveFindingPaths(f: Finding, root: string): Finding {
   return {
     ...f,
-    file:         resolveWorkspacePath(root, f.file)         ?? f.file,
-    exploit_path: resolveWorkspacePath(root, f.exploit_path) ?? f.exploit_path,
+    file:          resolveWorkspacePath(root, f.file)          ?? f.file,
+    proofTestPath: resolveWorkspacePath(root, f.proofTestPath) ?? f.proofTestPath,
   };
 }
 
@@ -222,20 +222,20 @@ function openReportCommand(): void {
   }
 }
 
-// Triggered by: inline ⚗ button, context menu "Open Exploit Test"
+// Triggered by: inline ⚗ button, context menu "Open Proof Test"
 // Also accepts a plain string path for backwards compat.
-function openExploitTestCommand(arg?: unknown): void {
+function openProofTestCommand(arg?: unknown): void {
   // Handle direct string path (legacy)
   if (typeof arg === 'string') {
-    const filePath = resolveAndCheck(arg, 'Exploit test file');
+    const filePath = resolveAndCheck(arg, 'Proof test file');
     if (filePath) { vscode.window.showTextDocument(vscode.Uri.file(filePath)); }
     return;
   }
 
   const finding = unwrapFinding(arg);
-  log(`openExploitTest: finding=${finding?.function ?? 'none'}, exploit_path=${finding?.exploit_path ?? 'none'}`);
+  log(`openProofTest: finding=${finding?.function ?? 'none'}, proof_path=${finding?.proofTestPath ?? 'none'}`);
 
-  const filePath = resolveAndCheck(finding?.exploit_path, 'Exploit test file');
+  const filePath = resolveAndCheck(finding?.proofTestPath, 'Proof test file');
   if (!filePath) { return; }
 
   vscode.window.showTextDocument(vscode.Uri.file(filePath));

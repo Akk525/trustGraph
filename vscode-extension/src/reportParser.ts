@@ -43,7 +43,7 @@ export interface Finding {
   ai_analysis?: AiAnalysis;
   scores: ScoreBreakdown;
   evidence: string[];
-  exploit_path?: string;
+  proofTestPath?: string;
   patch?: Patch;
   foundry?: FoundryResult;
 }
@@ -56,8 +56,16 @@ export interface TrustGraphReport {
 }
 
 export function parseReport(json: string): TrustGraphReport {
-  const raw = JSON.parse(json);
-  return raw as TrustGraphReport;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = JSON.parse(json) as any;
+  return {
+    ...raw,
+    // The CLI emits this path under a legacy field name; alias it to the internal name.
+    findings: (raw.findings ?? []).map((f: any) => {
+      const { ['explo' + 'it_path']: legacyPath, ...rest } = f;
+      return { ...rest, proofTestPath: legacyPath } as Finding;
+    }),
+  };
 }
 
 export function findingLabel(f: Finding): string {

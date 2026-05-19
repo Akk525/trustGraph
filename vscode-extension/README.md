@@ -1,31 +1,77 @@
-# TrustGraph VS Code Extension
+# TrustGraph — Solidity Trust-Boundary Analyser
 
-Inline diagnostics, sidebar findings tree, and detail webviews for [TrustGraph](../README.md) — the Solidity trust-boundary vulnerability scanner.
+Inline diagnostics and investigation workflow for [TrustGraph](https://github.com/Akk525/trustGraph), a deterministic Solidity trust-boundary scanner that generates reproducible Foundry proof tests.
+
+---
+
+## What This Extension Does
+
+TrustGraph identifies externally callable Solidity functions that accept untrusted caller input without caller guards — a recurring unsafe trust path in bridge receivers, cross-chain handlers, and token contracts. Detection uses a fixed four-predicate rule set (E ∧ P ∧ V ∧ ¬G). No model confidence scores, no sampling variance.
+
+This extension surfaces those findings directly in VS Code:
+
+- **Inline diagnostics** — red squiggles for Critical, yellow for Medium
+- **Findings sidebar** — severity-grouped tree with scan summary
+- **Detail webview** — evidence, trust assumption, Gemini explanation (optional), Foundry test result, patch template
+- **One-click navigation** — jump to source line, open generated proof test, copy patch
+
+---
+
+## Screenshots
+
+**Findings sidebar with severity groups and scan summary**
+
+![Findings Sidebar](./media/screenshots/findings-sidebar.png)
+
+**Inline diagnostic on a vulnerable function**
+
+![Inline Diagnostic](./media/screenshots/inline-diagnostic.png)
+
+**Finding detail panel — evidence, analysis, Foundry result, patch**
+
+![Finding Detail Panel](./media/screenshots/critical-finding-panel.png)
+
+**Generated Foundry proof test**
+
+![Foundry Proof Test](./media/screenshots/foundry-proof-test.png)
 
 ---
 
 ## Requirements
 
-- TrustGraph CLI installed and accessible (see main README)
-- VS Code 1.85+
+- **TrustGraph CLI** installed and on PATH (or set `trustgraph.cliPath`)
+  - Install: `pip install trustgraph` *(or clone and install from [source](https://github.com/Akk525/trustGraph))*
+- **VS Code** 1.85 or later
+- **Foundry** (`forge`) — required only if `trustgraph.runFoundry` is enabled
+
+> **Gemini explanations are optional.** TrustGraph reads `GEMINI_API_KEY` from your local shell environment or a `.env` file in the CLI's working directory. API keys are never required for deterministic analysis and must not be committed to source control.
 
 ---
 
-## Install (local dev)
+## Install
 
-```bash
-cd vscode-extension
-npm install
-npm run compile    # builds ./out/
-```
-
-Press **F5** in VS Code (with the extension folder open) to launch the Extension Development Host.
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=akk525.trustgraph) or search **TrustGraph** in the Extensions panel.
 
 ---
 
-## Output directory
+## Workflow
 
-All generated files (reports, exploit tests) are written to a hidden `.trustgraph/` folder inside your workspace root by default:
+1. Open a Solidity project in VS Code.
+2. If `trustgraph` is not on PATH, set `trustgraph.cliPath` in settings.
+3. Run **TrustGraph: Run Audit** from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
+4. A progress notification appears; CLI output streams to the **TrustGraph** Output channel.
+5. On completion:
+   - Critical findings appear as **red squiggles** in `.sol` files.
+   - Medium findings appear as **yellow squiggles**.
+   - The **TrustGraph sidebar** (shield icon in the Activity Bar) shows a scan summary and findings grouped by severity.
+6. Click any finding to open the detail panel: evidence, trust assumption, optional Gemini explanation, Foundry CI result, and patch template.
+7. Right-click a finding in the sidebar for the context menu: **Open Detail**, **Go to Source**, **Open Proof Test**, **Copy Patch**.
+
+---
+
+## Generated Output
+
+All generated files are written to `.trustgraph/` inside your workspace root by default:
 
 ```
 <workspace>/
@@ -33,118 +79,85 @@ All generated files (reports, exploit tests) are written to a hidden `.trustgrap
     report.md
     report.json
     tests/
-      VulnerableReceiverExploit.t.sol
+      ReceiverProofTest.t.sol
 ```
 
-This keeps your working tree clean. Add it to `.gitignore` to avoid committing generated outputs:
-
-```
-# .gitignore
-.trustgraph/
-```
-
-To change the output location, set `trustgraph.outputDir` to any relative or absolute path.
+Add `.trustgraph/` to your `.gitignore` to avoid committing generated outputs. Change the location with the `trustgraph.outputDir` setting.
 
 ---
 
 ## Configuration
 
-All settings are under `trustgraph.*` in VS Code settings:
+All settings are under `trustgraph.*` in VS Code settings (`Ctrl+,` / `Cmd+,`):
 
 | Setting | Default | Description |
-|---------|---------|-------------|
-| `trustgraph.contractPath` | workspace root | Path to `.sol` file or directory (relative or absolute) |
-| `trustgraph.outputDir` | `.trustgraph` | Output directory for reports and tests (relative or absolute) |
-| `trustgraph.generateTest` | `true` | Generate Foundry PoC exploit tests |
+|---|---|---|
+| `trustgraph.contractPath` | workspace root | Path to a `.sol` file or directory (relative or absolute) |
+| `trustgraph.outputDir` | `.trustgraph` | Output directory for reports and generated tests |
+| `trustgraph.generateTest` | `true` | Generate Foundry proof tests for trust-boundary findings |
 | `trustgraph.runFoundry` | `false` | Execute `forge test` after generating tests |
 | `trustgraph.reportFormat` | `both` | `markdown`, `json`, or `both` |
-| `trustgraph.cliPath` | *(PATH lookup)* | Full path to `trustgraph` binary |
+| `trustgraph.cliPath` | *(PATH lookup)* | Full path to the `trustgraph` binary |
 
 Relative paths in `contractPath` and `outputDir` are resolved against the workspace root.
 
-If the `trustgraph` binary is installed via pyenv or a virtualenv not in VS Code's PATH, set `trustgraph.cliPath`:
+If the `trustgraph` binary is in a virtualenv or pyenv that VS Code's PATH doesn't include, set `cliPath` explicitly:
 
 ```json
-"trustgraph.cliPath": "/Users/akk/.pyenv/versions/3.12.4/bin/trustgraph"
+"trustgraph.cliPath": "/Users/you/.pyenv/versions/3.12.4/bin/trustgraph"
 ```
 
 ---
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `TrustGraph: Run Audit` | Run the CLI, parse `report.json`, populate diagnostics and tree |
-| `Open Detail` *(sidebar context)* | Show finding detail webview |
-| `Go to Source` *(sidebar context)* | Jump to the finding's source line |
-| `Open Exploit Test` *(sidebar context)* | Open the generated `.t.sol` file |
-| `Copy Patch` *(sidebar context)* | Copy the recommended patch to clipboard |
-| `TrustGraph: Open Report File` | Open `report.md` (or `report.json`) from the output directory |
-| `TrustGraph: Clear Findings` | Remove all diagnostics and reset the sidebar |
-
-The **▶ Run Audit** and **Clear** buttons are also available in the TrustGraph sidebar toolbar.
-
----
-
-## Demo Flow
-
-1. Open the TrustGraph project (or any Solidity project) in VS Code.
-2. Set `trustgraph.cliPath` if needed.
-3. Run **TrustGraph: Run Audit** from the Command Palette (`⌘⇧P`).
-4. A progress notification appears while the CLI runs; output streams to the **TrustGraph** Output channel.
-5. When done:
-   - Critical findings appear as **red squiggles** in `.sol` files.
-   - Medium findings appear as **yellow squiggles**.
-   - The **TrustGraph sidebar** (shield icon) shows a Scan Summary and findings grouped by severity.
-6. Click any finding to open the **detail webview** — evidence, trust assumption, AI analysis, patch, and Foundry CI result.
-7. Right-click a finding for the context menu: **Open Detail**, **Go to Source**, **Open Exploit Test**, **Copy Patch**.
+| Command | Trigger |
+|---|---|
+| **TrustGraph: Run Audit** | Command Palette; sidebar toolbar ▶ button |
+| **TrustGraph: Clear Findings** | Command Palette; sidebar toolbar ✕ button |
+| **Open Detail** | Right-click finding in sidebar |
+| **Go to Source** | Right-click finding in sidebar |
+| **Open Proof Test** | Right-click finding in sidebar |
+| **Copy Patch** | Right-click finding in sidebar |
+| **TrustGraph: Open Report File** | Command Palette |
 
 ---
 
 ## Troubleshooting
 
-### "TrustGraph: Audit failed or report.json not found"
+**"Audit failed or report.json not found"**
+Check the **TrustGraph** Output channel (`View → Output → TrustGraph`) for the full command and error. Confirm `trustgraph.cliPath` is correct and `trustgraph.contractPath` points to a valid `.sol` file or directory.
 
-- Check the **TrustGraph** Output channel (`View → Output → TrustGraph`) for the full command and error.
-- Make sure `trustgraph.cliPath` points to the correct binary: `which trustgraph` or `/Users/you/.pyenv/versions/3.12.4/bin/trustgraph`.
-- Confirm `trustgraph.contractPath` is a valid `.sol` file or directory containing `.sol` files.
+**"Source file not found" / "Proof test file not found"**
+The resolved path is logged in the Output channel. If you changed `trustgraph.outputDir` after running an audit, re-run the audit to regenerate with the current path.
 
-### "Source file not found" / "Exploit test file not found"
+**Gemini quota exceeded**
+The detail panel shows "Gemini quota exceeded; deterministic fallback used." Findings are still complete — only the plain-language explanation is unavailable. The audit result is valid.
 
-- Open the TrustGraph Output channel — the full resolved path is logged.
-- If you moved the output directory after running the audit, run **TrustGraph: Run Audit** again to regenerate with the current `trustgraph.outputDir`.
-- Relative paths are resolved against the workspace root. Use an absolute path in settings if in doubt.
+**No Gemini API key**
+If `GEMINI_API_KEY` is not set in the shell that launched VS Code, the tool falls back to deterministic classification automatically. The audit is unaffected.
 
-### Gemini quota exceeded
+**Foundry not installed**
+If `trustgraph.runFoundry` is `true` but `forge` is not on PATH, the Foundry step fails and findings show "NOT RUN" in the detail panel. Install via `curl -L https://foundry.paradigm.xyz | bash && foundryup`.
 
-The extension shows "Gemini quota exceeded; deterministic fallback used." in the AI Analysis card. This is expected behaviour — findings are still reported with full deterministic evidence. No action needed; the audit result is still valid.
-
-### No Gemini API key
-
-If `GEMINI_API_KEY` is not set in the shell that launched VS Code, the tool falls back to deterministic classification automatically. Set the key in your shell profile or in a `.env` file at the workspace root (it is gitignored by default).
-
-### Foundry not installed
-
-If `trustgraph.runFoundry` is `true` but `forge` is not on PATH, the Foundry step will fail silently and the finding will show "NOT RUN" in the Foundry Result card. Install Foundry via `curl -L https://foundry.paradigm.xyz | bash && foundryup`.
-
-### Extension does not activate
-
-The extension activates on `onLanguage:solidity`, `workspaceContains:**/*.sol`, or when the TrustGraph sidebar view is opened. If none of these fire, run **Developer: Reload Window** and click the shield icon in the Activity Bar.
+**Extension does not activate**
+The extension activates when a `.sol` file is opened or the TrustGraph sidebar is clicked. Run **Developer: Reload Window** if neither fires.
 
 ---
 
-## Architecture
+## Limitations
 
-```
-src/
-├── extension.ts        — activate(), command registrations
-├── trustgraphRunner.ts — spawn CLI subprocess, resolve config
-├── reportParser.ts     — TypeScript interfaces, JSON parsing
-├── diagnostics.ts      — DiagnosticCollection management
-├── findingsProvider.ts — TreeDataProvider (severity groups, state machine)
-├── pathUtils.ts        — resolveWorkspacePath() utility
-└── webview.ts          — FindingDetailPanel (WebviewPanel)
-media/
-├── style.css           — VS Code CSS variables theming
-└── trustgraph-icon.svg — Activity bar icon
-```
+- Analyses one file or directory at a time — no cross-project scanning
+- Detection is scoped to the trust-boundary class (E ∧ P ∧ V ∧ ¬G); does not cover reentrancy, overflow, or other issue classes
+- No cross-file or cross-contract dataflow — each function is evaluated within its source file
+- Gemini explanation is optional and informational only; it cannot affect findings
+- Requires the TrustGraph CLI to be installed separately
+
+---
+
+## Links
+
+- [TrustGraph repository](https://github.com/Akk525/trustGraph)
+- [CLI documentation](https://github.com/Akk525/trustGraph#readme)
+- [Issue tracker](https://github.com/Akk525/trustGraph/issues)
+- [License: MIT](https://github.com/Akk525/trustGraph/blob/main/LICENSE)

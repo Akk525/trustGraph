@@ -38,7 +38,7 @@ function groupIconName(severity: string): string {
 // contextValue encodes available actions so when-clauses in menus can branch
 function findingContextValue(finding: Finding): string {
   const parts = ['trustgraphFinding'];
-  if (finding.exploit_path) { parts.push('exploit'); }
+  if (finding.proofTestPath) { parts.push('proofTest'); }
   if (finding.patch)        { parts.push('patch'); }
   return parts.join(':');
 }
@@ -51,7 +51,7 @@ function buildTooltip(finding: Finding): vscode.MarkdownString {
   md.appendMarkdown(`**Function:** \`${finding.function}\`  \n`);
   md.appendMarkdown(`**File:** ${filename}:${finding.line}  \n`);
   md.appendMarkdown(`**Category:** ${finding.category}  \n\n`);
-  md.appendMarkdown(`**Attack Vector:** ${finding.trust_assumption.attack_vector}`);
+  md.appendMarkdown(`**Unsafe Trust Path:** ${finding.trust_assumption.attack_vector}`);
   return md;
 }
 
