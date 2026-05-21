@@ -2,11 +2,12 @@
 
 > **Deterministic Solidity trust-boundary analysis with Foundry exploit proof generation.**
 
-<!-- Recommended GitHub repo description: "Deterministic Solidity trust-boundary analysis with executable Foundry exploit validation." -->
+<!-- GitHub repo description: "Deterministic Solidity trust-boundary analysis with executable Foundry exploit validation." -->
+<!-- GitHub topics: solidity smart-contracts security static-analysis foundry exploit-generation vscode-extension ethereum defi-security web3-security -->
 
-TrustGraph scans Solidity contracts for externally callable functions that accept attacker-controlled payloads without caller guards, generates Foundry PoC tests for each finding, and runs them via `forge test`. A VS Code extension exposes findings as inline diagnostics with an investigation sidebar.
+TrustGraph scans Solidity contracts for externally callable functions that accept attacker-controlled payloads without caller guards, generates a Foundry PoC test for each finding, and runs it via `forge test`. A VS Code extension exposes findings as inline diagnostics with a full investigation sidebar.
 
-**Detection is deterministic**: an explicit four-predicate heuristic (E ∧ P ∧ V ∧ ¬G) determines every finding and severity. Optional Gemini 2.5 Flash adds natural-language explanation only — it cannot create, modify, or suppress findings.
+**Detection is deterministic**: a four-predicate rule set (E ∧ P ∧ V ∧ ¬G) determines every finding and severity assignment. Optional Gemini 2.5 Flash adds a plain-language explanation after the finding is complete — it cannot create, modify, or suppress findings.
 
 ---
 
@@ -20,16 +21,12 @@ trustgraph audit examples/vulnerable-crosschain/src \
   --output-dir .trustgraph
 ```
 
-Terminal output:
-
 ```
 Critical → receiveMessage   VulnerableReceiver.sol:27
 Medium   → mint             MockToken.sol:18
 
 [PASS] test_directInvocationExploit() (gas: 67996)
 ```
-
-Generated outputs:
 
 ```
 .trustgraph/
@@ -39,41 +36,54 @@ Generated outputs:
     └── VulnerableReceiverExploit.t.sol
 ```
 
-### Findings Sidebar
-
-![Findings Sidebar](screenshots/findings-sidebar.png)
-
-### Critical Finding Panel
-
-Each finding panel shows deterministic evidence, access-control verdict, optional Gemini explanation, the generated exploit test, and a patch template.
-
-![Critical Finding Panel](screenshots/critical-finding-panel.png)
-
-### Generated Exploit PoC
-
-![Exploit Test](screenshots/exploit-test.png)
-
 ---
 
 ## Why TrustGraph Exists
 
-Cross-chain bridge receiver functions are a recurring attack surface: an `external` function accepts an arbitrary payload with no `msg.sender` check, and any caller can trigger privileged state changes directly. The August 2024 CrossCurve bridge exploit (~$5M) is a concrete example; the same pattern appears in LayerZero receivers, Axelar gateways, and custom bridge integrations.
+Cross-chain bridge receiver functions are a recurring attack surface: an `external` function accepts an arbitrary payload with no `msg.sender` check, so any address can trigger privileged state changes directly. The August 2024 CrossCurve bridge exploit (~$5M) is a concrete example; the same pattern appears across LayerZero receivers, Axelar gateways, and custom bridge integrations.
 
-TrustGraph addresses this with three concrete guarantees:
+TrustGraph addresses this class with three engineering guarantees:
 
-- **Auditable findings** — every result traces to a fixed predicate (E ∧ P ∧ V ∧ ¬G) applied to function source text. No model confidence scores, no sampling variance.
-- **Executable PoC** — each Critical or Medium finding produces a Foundry test. If `forge test` passes, the specific exploit path works. If it fails, the finding is still reported with the test attached for manual review.
-- **No LLM in the decision path** — Gemini is an optional explanation layer. Disable it with `--no-ai` and the scanner, exploit generator, and reports all continue to function identically.
+- **Auditable findings** — every result traces to a fixed predicate (E ∧ P ∧ V ∧ ¬G) evaluated against function source text. No model confidence scores, no sampling variance.
+- **Executable PoC** — each Critical or Medium finding produces a Foundry test. If `forge test` passes, the specific exploit path is confirmed. If it fails, the finding is still reported with the test attached for manual review.
+- **No LLM in the decision path** — Gemini is an optional explanation layer added after severity is assigned. Pass `--no-ai` and the scanner, exploit generator, and reports are unchanged.
+
+---
+
+## Design Principles
+
+**Deterministic analysis over probabilistic scoring.** Findings are produced by an explicit, fixed predicate. The same function source produces the same result on every run. Nothing is tuned, sampled, or model-dependent.
+
+**Reproducible exploit validation.** Each finding is backed by a generated Foundry test. Exploitability of the generated path is a binary outcome — `forge test` passes or it does not.
+
+**Human-auditable evidence.** Every finding exposes the matched predicate conditions and the function source that triggered them. No black-box reasoning.
+
+**Optional AI enrichment, never AI dependency.** Gemini adds a plain-language explanation once the finding is complete. Disable it with `--no-ai` and the tool is functionally identical.
+
+**Developer workflow integration.** Findings surface in the editor as diagnostics, not just a report file. The investigation path is: inline highlight → findings sidebar → detail panel → exploit test → patch template.
+
+---
+
+## Non-Goals
+
+TrustGraph is scoped to a specific vulnerability class. It explicitly does not attempt to:
+
+- **Symbolic execution** — no SMT solver, no path exploration, no formal verification
+- **Full contract auditing** — does not reason about reentrancy, integer overflow, access control patterns beyond caller guards, or arbitrary vulnerability classes
+- **Cross-file or cross-contract analysis** — each function is evaluated within its source file
+- **Autonomous patching** — patch templates are human-review suggestions only; no code is modified automatically
+- **Audit replacement** — TrustGraph surfaces trust-boundary candidates; it is not a substitute for a professional audit
+- **Production readiness certification** — a passing PoC confirms the generated exploit path executes; it makes no claim about other attack surfaces
 
 ---
 
 ## Features
 
-- Regex-based heuristic predicate scoring (E/P/V/G) on externally callable functions
+- Four-predicate static analysis (E/P/V/G) across all externally callable functions
 - Cross-chain receiver vulnerability detection
 - Auto-generated Foundry exploit PoC tests, executed via `forge test`
-- Optional Gemini 2.5 Flash explanation layer (detection and severity are unaffected)
-- Automatic deterministic fallback when Gemini is absent or errors
+- Optional Gemini 2.5 Flash explanation layer — detection and severity are unaffected
+- Automatic fallback to deterministic-only when Gemini is absent or errors
 - Markdown + JSON report output
 - VS Code extension: inline diagnostics, findings sidebar, exploit test viewer, patch templates
 - GitHub Actions CI/CD workflow included
@@ -181,11 +191,23 @@ Reports and exploit tests are written to `.trustgraph/` (gitignored).
 | Open Exploit Test | Open the generated `.t.sol` |
 | Copy Patch | Copy the recommended fix to clipboard |
 
+**Inline diagnostics — vulnerable function highlighted in-editor with PROBLEMS panel entries:**
+
+![Inline Diagnostics](screenshots/inline-diagnostic.png)
+
+**Findings sidebar — severity-grouped tree, populated after a scan:**
+
+![Findings Sidebar](screenshots/findings-sidebar.png)
+
+**Critical finding detail panel — predicate evidence, trust assumption breakdown, Foundry result:**
+
+![Critical Finding Panel](screenshots/critical-finding-panel.png)
+
 ---
 
 ## Vulnerability Model
 
-A function is flagged when it satisfies all four predicate conditions:
+A function is flagged when all four predicate conditions hold:
 
 ```
 Vulnerable(f) = E(f) ∧ P(f) ∧ V(f) ∧ ¬G(f)
@@ -193,12 +215,12 @@ Vulnerable(f) = E(f) ∧ P(f) ∧ V(f) ∧ ¬G(f)
 
 | Predicate | Meaning | How detected |
 |---|---|---|
-| `E(f)` | `external` or `public` visibility | Regex on function signature |
+| `E(f)` | `external` or `public` visibility | Visibility keyword match on function signature |
 | `P(f)` | Accepts attacker-controlled payload | `bytes calldata`, `abi.decode`, param names containing `payload`/`data`/`message` |
-| `V(f)` | Critical state mutation in body | `.mint(`, `.transfer(`, `.withdraw(`, `balances[` keywords |
-| `G(f)` | Caller guard present | `require(msg.sender ==`, `onlyOwner`, `onlyBridge`, `trustedBridge` keywords |
+| `V(f)` | Critical state mutation in body | `.mint(`, `.transfer(`, `.withdraw(`, `balances[` |
+| `G(f)` | Caller guard present in body | `require(msg.sender ==`, `onlyOwner`, `onlyBridge`, `trustedBridge` |
 
-**False negative note:** `G(f)` is keyword-matched within the function body only. A guard in a modifier defined on the function signature, a parent contract, or a calling function will not be detected (see [Limitations](#limitations)).
+> **False negative note:** `G(f)` is evaluated within the function body only. Guards expressed as function modifiers, inherited from a parent contract, or present in a calling function are not detected. See [Limitations](#limitations).
 
 **Severity assignment:**
 
@@ -215,7 +237,7 @@ Vulnerable(f) = E(f) ∧ P(f) ∧ V(f) ∧ ¬G(f)
 ```mermaid
 flowchart TD
     A[Solidity Contracts] --> B[TrustGraph CLI]
-    B --> C[Static Scanner\nE / P / V / G regex scoring]
+    B --> C[Static Scanner\nE / P / V / G predicate scoring]
     C --> D[Trust Assumption Inference\ndeterministic + optional Gemini explanation]
     D --> E[Guard Validation\nconfirm guard absence in function body]
     E --> F[Exploit Generator\nFoundry PoC template rendering]
@@ -224,17 +246,17 @@ flowchart TD
     G --> I[VS Code Extension\ndiagnostics + investigation]
 ```
 
-The pipeline is implemented as an 8-stage DAG using [LangGraph](https://github.com/langchain-ai/langgraph) as the execution framework. Each stage is a pure function operating on a typed state object; LangGraph is not used for agent planning or LLM routing — it provides DAG wiring and state passing only.
+The pipeline runs as an 8-stage DAG using [LangGraph](https://github.com/langchain-ai/langgraph) as the execution framework. Each stage is a pure function on a typed state object; LangGraph is not used for agent planning or LLM routing — it handles DAG wiring and state passing only.
 
 **Project layout:**
 
 ```
 trustgraph/
 ├── cli.py              — Typer CLI entry point
-├── graph.py            — 8-stage LangGraph pipeline DAG
+├── graph.py            — 8-stage pipeline DAG
 ├── models.py           — Pydantic models + WorkflowState
 ├── scanners/
-│   └── solidity.py     — Regex function extractor + E/P/V/G scorer
+│   └── solidity.py     — Function extractor + E/P/V/G scorer
 ├── agents/
 │   ├── trust_assumption.py   — Deterministic classifier + optional Gemini call
 │   ├── exploit_generator.py  — Foundry PoC template engine
@@ -258,6 +280,10 @@ flowchart LR
     D --> E["Generated Foundry PoC\n.t.sol"]
     E --> F["forge test\npass = exploit path confirmed"]
 ```
+
+**Generated exploit test — Foundry PoC produced by TrustGraph for the bundled example:**
+
+![Generated Exploit Test](screenshots/exploit-test.png)
 
 ---
 
@@ -283,7 +309,7 @@ flowchart LR
     gem -. enriches explanation .-> R
 ```
 
-The Gemini layer is called once per finding after severity is already assigned, to generate a human-readable explanation of why the trust assumption is dangerous. It receives the function source and the predicate verdicts as context. Its output populates the `ai_analysis` field in reports and the VS Code panel; it cannot change `severity`, `is_vulnerable`, or exploit generation.
+Gemini is called once per finding after severity is already assigned. It receives the function source and the predicate verdicts as context. Its output populates the `ai_analysis` field in reports and the VS Code detail panel. It cannot change `severity`, `is_vulnerable`, or exploit generation.
 
 **Gemini fallback behaviour:**
 
@@ -311,19 +337,19 @@ TrustGraph includes a GitHub Actions workflow (`.github/workflows/trustgraph.yml
 
 ## Limitations
 
-Detection is regex-based heuristic matching on individual function bodies. Current scope boundaries:
+Detection operates on individual function bodies via keyword pattern matching. Current scope boundaries:
 
-- **No modifier resolution** — `onlyOwner` on the function signature is not detected as a guard; only `require(...)` statements inside the function body are checked
-- **No inheritance resolution** — guards defined in a parent contract are not traced
-- **No cross-function taint tracking** — a guard in a wrapper or calling function is not propagated
+- **Modifier-only guards not detected** — `onlyOwner` on the function signature is not evaluated; only `require(...)` inside the function body is checked
+- **No inheritance resolution** — guards defined in a parent contract are not traced into the child
+- **No cross-function guard propagation** — a guard in a wrapper or calling function is not credited to the callee
 - **Single-file scope** — data flows across multiple `.sol` files are not tracked
-- **Keyword sensitivity** — non-standard naming conventions may produce false negatives or false positives
+- **Pattern-sensitive** — non-standard naming conventions may produce false negatives; unusual patterns may produce false positives
 
 ---
 
 ## Future Work
 
-- AST-level parsing via `solc --ast-compact-json` to replace regex extraction
+- AST-level parsing via `solc --ast-compact-json` to replace keyword extraction
 - Modifier and inheritance resolution
 - Cross-function and cross-contract call graph analysis
 - Slither integration as a complementary analysis pass
@@ -333,9 +359,15 @@ Detection is regex-based heuristic matching on individual function bodies. Curre
 
 ## Security Disclaimer
 
-TrustGraph is a research prototype and has not been security-audited.
+TrustGraph is an early-stage tool and has not itself been security-audited.
 
-A passing Foundry test confirms that the generated exploit PoC executes successfully against the generated test harness — it does not prove the absence of other attack paths or that the contract is otherwise safe. All findings require human review. TrustGraph does not replace a professional smart contract audit.
+A passing Foundry test confirms that the generated exploit PoC executes successfully against the generated test harness. It does not prove the absence of other attack paths or that the contract is otherwise safe. All findings require human review before drawing production conclusions. TrustGraph is not a substitute for a professional smart contract audit.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, test instructions, the deterministic-first design constraint, and the PR checklist.
 
 ---
 

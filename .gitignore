@@ -23,3 +23,26 @@ examples/vulnerable-crosschain/cache/
 
 docs/
 FINAL_DEMO.md
+
+# OS artefacts
+.DS_Store
+**/.DS_Store
+
+# Local environment / secrets
+*.local
+.env.*
+
+# Claude Code
+.claude/
+
+# VS Code extension packages
+*.vsix
+
+# Local recordings and raw scratch assets
+recordings/
+raw-assets/
+
+# Scratch / draft docs
+screenshots-checklist.md
+demo-script.md
+architecture-summary.md
