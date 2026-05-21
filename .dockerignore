@@ -1,0 +1,35 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Cloud service layer — not installed in the worker image
+trustgraph_cloud/
+
+# Test suite and docs — not needed in the image
+tests/
+docs/
+
+# VS Code extension build artifacts
+vscode-extension/
+*.vsix
+
+# Example contracts — sourced at runtime via workspace mounts
+examples/
+
+# Outputs and workspace dirs
+trustgraph-output*/
+.trustgraph-cloud/
+
+# Environment files — secrets must not bake into the image
+.env
+.env.*
+
+# Screenshots and markdown docs
+screenshots/
+*.md

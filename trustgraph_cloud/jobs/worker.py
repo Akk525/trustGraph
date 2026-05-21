@@ -11,15 +11,20 @@ from trustgraph_cloud.jobs.queue import JobQueue
 from trustgraph_cloud.jobs.store import JobStore
 from trustgraph_cloud.logging import logger
 from trustgraph_cloud.runner.audit_service import AuditServiceError, run_audit
+from trustgraph_cloud.runner.docker_runner import run_audit_in_docker
 
 
 class Worker:
     """
-    Pulls job IDs from the queue and executes the TrustGraph audit in a thread pool.
+    Pulls job IDs from the queue and executes TrustGraph audits in a thread pool.
 
-    Phase 2 migration: replace the LocalJobQueue with an SQS consumer and
-    deploy this worker as an ECS Fargate task. The audit execution logic
-    (run_audit) is unchanged; only the queue integration changes.
+    Execution mode is controlled by Settings.execution_mode:
+      - "local_host"  (Phase 1)   — runs the audit in-process on the host.
+      - "docker"      (Phase 1.5) — spawns an isolated container per job.
+
+    Phase 2 migration: replace LocalJobQueue with an SQS consumer and deploy
+    this worker as an ECS Fargate task. run_audit / run_audit_in_docker are
+    unchanged; only the queue integration changes.
     """
 
     def __init__(
@@ -60,23 +65,41 @@ class Worker:
             status=JobStatus.RUNNING,
             started_at=datetime.now(tz=timezone.utc),
         )
-        logger.info("worker.job_started", extra={"job_id": job_id})
+        logger.info("worker.job_started", extra={
+            "job_id": job_id,
+            "execution_mode": self._settings.execution_mode,
+        })
 
         workspace = self._settings.job_workspace(job_id)
         loop = asyncio.get_event_loop()
 
-        try:
-            summary, artifact_names = await loop.run_in_executor(
-                self._executor,
-                lambda: run_audit(
-                    job_id=job_id,
-                    workspace=workspace,
-                    input_type=job.input_type,
-                    source_path=job.source_path,
-                    options=job.options,
-                    artifact_store=self._artifact_store,
-                ),
+        if self._settings.execution_mode == "docker":
+            s = self._settings
+            fn = lambda: run_audit_in_docker(
+                job_id=job_id,
+                workspace=workspace,
+                input_type=job.input_type,
+                source_path=job.source_path,
+                options=job.options,
+                artifact_store=self._artifact_store,
+                image=s.docker_image,
+                memory_limit=s.docker_memory_limit,
+                cpu_limit=s.docker_cpu_limit,
+                timeout_seconds=s.docker_timeout_seconds,
+                disable_network=s.docker_disable_network,
             )
+        else:
+            fn = lambda: run_audit(
+                job_id=job_id,
+                workspace=workspace,
+                input_type=job.input_type,
+                source_path=job.source_path,
+                options=job.options,
+                artifact_store=self._artifact_store,
+            )
+
+        try:
+            summary, artifact_names = await loop.run_in_executor(self._executor, fn)
             self._job_store.update(
                 job_id,
                 status=JobStatus.SUCCEEDED,

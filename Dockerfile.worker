@@ -1,0 +1,42 @@
+# TrustGraph worker image — Python 3.12 + Foundry (forge)
+# Runs the trustgraph audit CLI against /work/input and writes output to /work/output.
+# Designed for ephemeral container execution with --network none, --memory, --cpus limits.
+
+FROM python:3.12-slim
+
+# System packages required by the Foundry installer and forge at runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        curl \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Foundry toolchain (foundryup downloads forge/cast/anvil binaries)
+ENV PATH="/root/.foundry/bin:${PATH}"
+RUN curl -fsSL https://foundry.paradigm.xyz | bash \
+    && foundryup \
+    && install -m 755 /root/.foundry/bin/forge /usr/local/bin/forge \
+    && forge --version
+
+# Non-root runtime user (uid 1000 avoids root-owned output files on the host)
+RUN useradd -m -u 1000 -s /bin/bash trustgraph
+
+# Copy and install the Python package (trustgraph core only; trustgraph_cloud stays on host)
+WORKDIR /build
+COPY pyproject.toml ./
+COPY trustgraph/ ./trustgraph/
+RUN pip install --no-cache-dir ".[gemini]"
+
+# Workspace layout — the docker runner mounts host dirs onto these paths.
+# /work/input   — source contracts (mounted :ro)
+# /work/output  — reports and generated tests (mounted :rw)
+# /work/artifacts, /work/logs — reserved for future direct-mount use
+RUN mkdir -p /work/input /work/output /work/artifacts /work/logs \
+    && chown -R trustgraph:trustgraph /work
+
+USER trustgraph
+WORKDIR /work
+
+ENTRYPOINT ["trustgraph"]

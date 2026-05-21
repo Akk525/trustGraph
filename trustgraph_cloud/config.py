@@ -11,6 +11,16 @@ class Settings(BaseSettings):
     max_concurrent_workers: int = 1
     log_level: str = "INFO"
 
+    # Execution mode: "local_host" (Phase 1, trusted dev) | "docker" (Phase 1.5+, isolation)
+    execution_mode: str = "local_host"
+
+    # Docker runner settings (used when execution_mode="docker")
+    docker_image: str = "trustgraph-worker:latest"
+    docker_memory_limit: str = "512m"
+    docker_cpu_limit: str = "0.5"
+    docker_timeout_seconds: int = 300
+    docker_disable_network: bool = True
+
     model_config = {
         "env_prefix": "TRUSTGRAPH_",
         "env_file": ".env",
