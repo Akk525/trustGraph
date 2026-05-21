@@ -12,6 +12,9 @@ build/
 trustgraph-output*/
 .trustgraph/
 
+# TrustGraph Cloud local workspace (jobs, artifacts, logs)
+.trustgraph-cloud/
+
 # Node / VS Code extension build
 node_modules/
 vscode-extension/out/

@@ -12,6 +12,7 @@ dependencies = [
     "typer>=0.12.0",
     "langgraph>=0.2.0",
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
 ]
@@ -20,9 +21,15 @@ dependencies = [
 gemini = [
     "google-genai>=1.0.0",
 ]
+cloud = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "httpx>=0.27.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-mock>=3.14.0",
+    "httpx>=0.27.0",
 ]
 
 [project.scripts]
@@ -30,7 +37,7 @@ trustgraph = "trustgraph.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["trustgraph*"]
+include = ["trustgraph*", "trustgraph_cloud*"]
 
 [tool.pytest.ini_options]
 addopts = "-p no:web3"
