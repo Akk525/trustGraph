@@ -191,6 +191,148 @@ class TestRunAuditLocalPath(unittest.TestCase):
             )
 
 
+class TestRunAuditDemoPathResolution(unittest.TestCase):
+    """Verify demo path resolution: explicit setting → candidates → error."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmpdir.name)
+        self.workspace = self.root / "job-path"
+        self.workspace.mkdir()
+        self.artifact_store = LocalArtifactStore(self.root)
+
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+    def test_explicit_demo_source_path_is_used(self):
+        demo_dir = self.root / "explicit-demo" / "src"
+        demo_dir.mkdir(parents=True)
+        used_paths = []
+
+        def capture_config(config):
+            used_paths.append(config["path"])
+            return _MOCK_STATE_CLEAN
+
+        with patch("trustgraph_cloud.runner.audit_service.run_workflow", side_effect=capture_config):
+            run_audit(
+                job_id="job-path",
+                workspace=self.workspace,
+                input_type="demo",
+                source_path=None,
+                options=JobOptions(),
+                artifact_store=self.artifact_store,
+                demo_source_path=str(demo_dir),
+            )
+
+        self.assertEqual(used_paths[0], str(demo_dir))
+
+    def test_explicit_path_takes_priority_over_defaults(self):
+        # Both explicit and a default candidate exist — explicit wins.
+        explicit_dir = self.root / "explicit" / "src"
+        explicit_dir.mkdir(parents=True)
+
+        default_dir = self.root / "default" / "src"
+        default_dir.mkdir(parents=True)
+
+        used_paths = []
+
+        def capture_config(config):
+            used_paths.append(config["path"])
+            return _MOCK_STATE_CLEAN
+
+        from trustgraph_cloud.runner import audit_service as _svc
+        original = _svc._DEFAULT_DEMO_CANDIDATES
+        try:
+            _svc._DEFAULT_DEMO_CANDIDATES = [default_dir]
+            with patch("trustgraph_cloud.runner.audit_service.run_workflow", side_effect=capture_config):
+                run_audit(
+                    job_id="job-path",
+                    workspace=self.workspace,
+                    input_type="demo",
+                    source_path=None,
+                    options=JobOptions(),
+                    artifact_store=self.artifact_store,
+                    demo_source_path=str(explicit_dir),
+                )
+        finally:
+            _svc._DEFAULT_DEMO_CANDIDATES = original
+
+        self.assertEqual(used_paths[0], str(explicit_dir))
+
+    def test_fallback_to_default_candidate_when_explicit_missing(self):
+        fallback_dir = self.root / "fallback" / "src"
+        fallback_dir.mkdir(parents=True)
+
+        used_paths = []
+
+        def capture_config(config):
+            used_paths.append(config["path"])
+            return _MOCK_STATE_CLEAN
+
+        from trustgraph_cloud.runner import audit_service as _svc
+        original = _svc._DEFAULT_DEMO_CANDIDATES
+        try:
+            _svc._DEFAULT_DEMO_CANDIDATES = [fallback_dir]
+            with patch("trustgraph_cloud.runner.audit_service.run_workflow", side_effect=capture_config):
+                run_audit(
+                    job_id="job-path",
+                    workspace=self.workspace,
+                    input_type="demo",
+                    source_path=None,
+                    options=JobOptions(),
+                    artifact_store=self.artifact_store,
+                    demo_source_path="/does/not/exist",
+                )
+        finally:
+            _svc._DEFAULT_DEMO_CANDIDATES = original
+
+        self.assertEqual(used_paths[0], str(fallback_dir))
+
+    def test_missing_demo_raises_and_lists_all_candidates(self):
+        from trustgraph_cloud.runner import audit_service as _svc
+        original = _svc._DEFAULT_DEMO_CANDIDATES
+        fake_candidates = [Path("/fake/a"), Path("/fake/b")]
+        try:
+            _svc._DEFAULT_DEMO_CANDIDATES = fake_candidates
+            with self.assertRaises(AuditServiceError) as ctx:
+                run_audit(
+                    job_id="job-path",
+                    workspace=self.workspace,
+                    input_type="demo",
+                    source_path=None,
+                    options=JobOptions(),
+                    artifact_store=self.artifact_store,
+                    demo_source_path="/explicit/missing",
+                )
+        finally:
+            _svc._DEFAULT_DEMO_CANDIDATES = original
+
+        msg = str(ctx.exception)
+        self.assertIn("/explicit/missing", msg)
+        self.assertIn("/fake/a", msg)
+        self.assertIn("/fake/b", msg)
+
+    def test_missing_demo_no_explicit_raises_and_lists_defaults(self):
+        from trustgraph_cloud.runner import audit_service as _svc
+        original = _svc._DEFAULT_DEMO_CANDIDATES
+        fake_candidates = [Path("/fake/c")]
+        try:
+            _svc._DEFAULT_DEMO_CANDIDATES = fake_candidates
+            with self.assertRaises(AuditServiceError) as ctx:
+                run_audit(
+                    job_id="job-path",
+                    workspace=self.workspace,
+                    input_type="demo",
+                    source_path=None,
+                    options=JobOptions(),
+                    artifact_store=self.artifact_store,
+                )
+        finally:
+            _svc._DEFAULT_DEMO_CANDIDATES = original
+
+        self.assertIn("/fake/c", str(ctx.exception))
+
+
 class TestRunAuditErrors(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()

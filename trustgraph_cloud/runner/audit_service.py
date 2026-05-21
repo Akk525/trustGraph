@@ -10,8 +10,16 @@ from trustgraph_cloud.artifacts.store import ArtifactStore
 from trustgraph_cloud.jobs.models import FindingsSummary, JobOptions
 from trustgraph_cloud.logging import logger
 
-# Bundled demo contracts shipped with the repo.
-_DEMO_SRC = Path(__file__).parent.parent.parent / "examples" / "vulnerable-crosschain" / "src"
+# Candidate paths for the bundled demo contracts, checked in order.
+# The explicit TRUSTGRAPH_DEMO_SOURCE_PATH setting is prepended at call time.
+_DEFAULT_DEMO_CANDIDATES: list[Path] = [
+    # Editable / dev install — repo root sits three levels above this file.
+    Path(__file__).parent.parent.parent / "examples" / "vulnerable-crosschain" / "src",
+    # ECS Fargate container — Dockerfile.worker copies examples/ into /build/.
+    Path("/build/examples/vulnerable-crosschain/src"),
+    # Phase 1.5 Docker runner container workspace.
+    Path("/work/examples/vulnerable-crosschain/src"),
+]
 
 
 class AuditServiceError(Exception):
@@ -25,6 +33,7 @@ def run_audit(
     source_path: Optional[str],
     options: JobOptions,
     artifact_store: ArtifactStore,
+    demo_source_path: Optional[str] = None,
 ) -> tuple[FindingsSummary, list[str]]:
     """
     Execute a TrustGraph analysis job inside an isolated workspace.
@@ -45,9 +54,18 @@ def run_audit(
 
     # ── Resolve the scan path ─────────────────────────────────────────────────
     if input_type == "demo":
-        if not _DEMO_SRC.exists():
-            raise AuditServiceError(f"Demo source not found at {_DEMO_SRC}")
-        scan_path = str(_DEMO_SRC)
+        candidates: list[Path] = (
+            [Path(demo_source_path)] if demo_source_path else []
+        ) + _DEFAULT_DEMO_CANDIDATES
+
+        resolved: Optional[Path] = next((c for c in candidates if c.exists()), None)
+        if resolved is None:
+            checked = ", ".join(str(c) for c in candidates)
+            raise AuditServiceError(
+                f"Demo source not found. Candidates checked: [{checked}]. "
+                f"Set TRUSTGRAPH_DEMO_SOURCE_PATH to the correct path."
+            )
+        scan_path = str(resolved)
         logger.info("audit.using_demo", extra={"job_id": job_id, "path": scan_path})
 
     elif input_type == "local_path":

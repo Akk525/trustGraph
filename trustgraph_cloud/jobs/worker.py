@@ -101,6 +101,7 @@ class Worker:
                 source_path=job.source_path,
                 options=job.options,
                 artifact_store=self._artifact_store,
+                demo_source_path=self._settings.demo_source_path,
             )
 
         try:

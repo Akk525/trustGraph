@@ -27,7 +27,9 @@ RUN useradd -m -u 1000 -s /bin/bash trustgraph
 WORKDIR /build
 COPY pyproject.toml ./
 COPY trustgraph/ ./trustgraph/
-RUN pip install --no-cache-dir ".[gemini]"
+COPY trustgraph_cloud/ ./trustgraph_cloud/
+COPY examples/ ./examples/
+RUN pip install --no-cache-dir ".[gemini,cloud]"
 
 # Workspace layout — the docker runner mounts host dirs onto these paths.
 # /work/input   — source contracts (mounted :ro)
@@ -39,4 +41,4 @@ RUN mkdir -p /work/input /work/output /work/artifacts /work/logs \
 USER trustgraph
 WORKDIR /work
 
-ENTRYPOINT ["trustgraph"]
+ENTRYPOINT ["trustgraph-worker"]

@@ -41,6 +41,26 @@ class Settings(BaseSettings):
     s3_presigned_url_ttl_seconds: int = 3600
     aws_endpoint_url: Optional[str] = None  # LocalStack or custom endpoint
 
+    # Job store backend: "local" | "dynamodb"  (env: TRUSTGRAPH_JOB_STORE)
+    job_store: str = "local"
+
+    # DynamoDB job store settings (used when job_store="dynamodb")
+    dynamodb_table: str = "trustgraph-jobs"
+    dynamodb_region: str = "us-east-1"
+
+    # Worker-only mode — set true in ECS Fargate worker tasks (no FastAPI)
+    worker_only: bool = False
+
+    # Embedded worker — set false when the API runs alongside a separate ECS worker
+    # (TRUSTGRAPH_JOB_QUEUE=sqs + ECS Fargate).  Defaults true so local dev is
+    # unchanged.  Setting false prevents the API process from also polling SQS.
+    embedded_worker: bool = True
+
+    # Explicit path to the bundled demo contracts.  When unset the audit service
+    # walks a candidate list (package-relative → /build/examples → /work/examples).
+    # Set TRUSTGRAPH_DEMO_SOURCE_PATH=/build/examples/vulnerable-crosschain/src in ECS.
+    demo_source_path: Optional[str] = None
+
     model_config = {
         "env_prefix": "TRUSTGRAPH_",
         "env_file": ".env",

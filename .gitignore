@@ -7,6 +7,9 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
+.venv/
+venv/
+env/
 
 # TrustGraph output (generated reports and exploit tests)
 trustgraph-output*/
@@ -23,6 +26,18 @@ vscode-extension/node_modules/
 # Example project build artefacts
 examples/vulnerable-crosschain/out/
 examples/vulnerable-crosschain/cache/
+
+# AWS CDK
+infra/cdk/cdk.out/
+infra/cdk/.venv/
+cdk.context.json
+*.cdk.context.json
+
+# Stray AWS / cloud installer files
+*.pkg
+*.dmg
+*.exe
+*.msi
 
 docs/
 FINAL_DEMO.md
@@ -49,3 +64,4 @@ raw-assets/
 screenshots-checklist.md
 demo-script.md
 architecture-summary.md
+CLAUDE.md

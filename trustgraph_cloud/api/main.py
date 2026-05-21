@@ -28,10 +28,26 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         s = _settings if _settings is not None else get_settings()
         configure_logging(s.log_level)
-        s.jobs_dir.mkdir(parents=True, exist_ok=True)
 
-        job_store = LocalJobStore(s.jobs_dir)
+        # -- Job store ------------------------------------------------------------
+        if s.job_store == "dynamodb":
+            if not s.dynamodb_table:
+                raise RuntimeError(
+                    "TRUSTGRAPH_DYNAMODB_TABLE must be set when TRUSTGRAPH_JOB_STORE=dynamodb"
+                )
+            from trustgraph_cloud.jobs.dynamodb_store import DynamoDBJobStore
+            job_store = DynamoDBJobStore(
+                table_name=s.dynamodb_table,
+                region=s.dynamodb_region,
+                endpoint_url=s.aws_endpoint_url,
+            )
+            logger.info("api.job_store", extra={"backend": "dynamodb", "table": s.dynamodb_table})
+        else:
+            s.jobs_dir.mkdir(parents=True, exist_ok=True)
+            job_store = LocalJobStore(s.jobs_dir)
+            logger.info("api.job_store", extra={"backend": "local"})
 
+        # -- Job queue ------------------------------------------------------------
         if s.job_queue == "sqs":
             if not s.sqs_queue_url:
                 raise RuntimeError(
@@ -67,26 +83,37 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         else:
             artifact_store = LocalArtifactStore(s.jobs_dir)
             logger.info("api.artifact_store", extra={"backend": "local"})
-        worker = Worker(
-            queue=job_queue,
-            job_store=job_store,
-            artifact_store=artifact_store,
-            settings=s,
-        )
 
         app.state.job_store = job_store
         app.state.artifact_store = artifact_store
         app.state.job_queue = job_queue
 
-        worker_task = asyncio.create_task(worker.run())
-        logger.info("api.startup", extra={"workspace": str(s.base_workspace)})
+        # -- Embedded worker (optional) -------------------------------------------
+        # Disabled when TRUSTGRAPH_EMBEDDED_WORKER=false — i.e. an ECS Fargate
+        # worker is polling the same SQS queue. The API only enqueues and reads
+        # status; it does not compete with the dedicated worker for messages.
+        if s.embedded_worker:
+            worker = Worker(
+                queue=job_queue,
+                job_store=job_store,
+                artifact_store=artifact_store,
+                settings=s,
+            )
+            worker_task = asyncio.create_task(worker.run())
+            logger.info("api.startup", extra={"workspace": str(s.base_workspace), "embedded_worker": True})
+        else:
+            worker = None
+            worker_task = None
+            logger.info("api.startup", extra={"workspace": str(s.base_workspace), "embedded_worker": False})
 
         yield
 
-        worker_task.cancel()
-        await asyncio.gather(worker_task, return_exceptions=True)
-        # Wait for any in-flight thread pool jobs to finish before releasing workspace.
-        await asyncio.get_event_loop().run_in_executor(None, worker.close)
+        if worker_task is not None:
+            worker_task.cancel()
+            await asyncio.gather(worker_task, return_exceptions=True)
+        if worker is not None:
+            # Wait for any in-flight thread pool jobs to finish before releasing workspace.
+            await asyncio.get_event_loop().run_in_executor(None, worker.close)
         logger.info("api.shutdown")
 
     app = FastAPI(
