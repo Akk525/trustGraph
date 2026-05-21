@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Protocol, runtime_checkable
 
@@ -9,8 +9,12 @@ from typing import Optional, Protocol, runtime_checkable
 @dataclass(frozen=True)
 class Artifact:
     name: str
-    path: str
+    path: str       # local filesystem path (local backend); empty string for S3
     size_bytes: int
+    storage_backend: str = "local"          # "local" | "s3"
+    s3_key: Optional[str] = None            # S3 object key (s3 backend only)
+    presigned_url: Optional[str] = None     # signed download URL (s3 backend only)
+    content_type: Optional[str] = None
 
 
 @runtime_checkable

@@ -22,9 +22,13 @@ class Worker:
       - "local_host"  (Phase 1)   — runs the audit in-process on the host.
       - "docker"      (Phase 1.5) — spawns an isolated container per job.
 
-    Phase 2 migration: replace LocalJobQueue with an SQS consumer and deploy
-    this worker as an ECS Fargate task. run_audit / run_audit_in_docker are
-    unchanged; only the queue integration changes.
+    Queue backend is controlled by Settings.job_queue:
+      - "local"  — asyncio.Queue (in-memory, single process)
+      - "sqs"    — AWS SQS with visibility timeout and ack semantics
+
+    Phase 2C migration: deploy this worker as an ECS Fargate task. The audit
+    execution logic and ack semantics are unchanged; only the deployment unit
+    changes (local process → Fargate task).
     """
 
     def __init__(
@@ -58,6 +62,7 @@ class Worker:
         job = self._job_store.get(job_id)
         if job is None:
             logger.error("worker.job_not_found", extra={"job_id": job_id})
+            await self._queue.ack(job_id)
             return
 
         self._job_store.update(
@@ -108,6 +113,8 @@ class Worker:
                 artifact_names=artifact_names,
             )
             logger.info("worker.job_succeeded", extra={"job_id": job_id})
+            await self._queue.ack(job_id)
+            logger.info("queue.message_acknowledged", extra={"job_id": job_id})
 
         except AuditServiceError as exc:
             self._job_store.update(
@@ -116,7 +123,11 @@ class Worker:
                 completed_at=datetime.now(tz=timezone.utc),
                 error_message=str(exc),
             )
-            logger.error("worker.job_failed", extra={"job_id": job_id, "error": str(exc)})
+            if self._queue.supports_retry:
+                logger.error("worker.job_failed_retry_pending", extra={"job_id": job_id, "error": str(exc)})
+                logger.info("queue.message_not_acknowledged", extra={"job_id": job_id})
+            else:
+                logger.error("worker.job_failed_no_retry", extra={"job_id": job_id, "error": str(exc)})
 
         except Exception as exc:
             self._job_store.update(
@@ -125,4 +136,8 @@ class Worker:
                 completed_at=datetime.now(tz=timezone.utc),
                 error_message=f"Unexpected worker error: {exc}",
             )
-            logger.error("worker.unexpected_error", extra={"job_id": job_id, "error": str(exc)})
+            if self._queue.supports_retry:
+                logger.error("worker.unexpected_error_retry_pending", extra={"job_id": job_id, "error": str(exc)})
+                logger.info("queue.message_not_acknowledged", extra={"job_id": job_id})
+            else:
+                logger.error("worker.unexpected_error", extra={"job_id": job_id, "error": str(exc)})

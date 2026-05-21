@@ -21,6 +21,26 @@ class Settings(BaseSettings):
     docker_timeout_seconds: int = 300
     docker_disable_network: bool = True
 
+    # Job queue backend: "local" | "sqs"  (env: TRUSTGRAPH_JOB_QUEUE)
+    job_queue: str = "local"
+
+    # SQS job queue settings (used when job_queue="sqs")
+    sqs_queue_url: str = ""
+    sqs_region: str = "us-east-1"
+    sqs_visibility_timeout_seconds: int = 300   # must exceed max audit duration
+    sqs_wait_time_seconds: int = 20             # long-poll window (0–20 seconds)
+    sqs_max_messages: int = 1                   # one job per poll; scale by adding workers
+
+    # Artifact store backend: "local" | "s3"  (env: TRUSTGRAPH_ARTIFACT_STORE)
+    artifact_store: str = "local"
+
+    # S3 artifact store settings (used when artifact_store="s3")
+    s3_bucket: str = ""
+    s3_prefix: str = "trustgraph/jobs"
+    aws_region: str = "us-east-1"
+    s3_presigned_url_ttl_seconds: int = 3600
+    aws_endpoint_url: Optional[str] = None  # LocalStack or custom endpoint
+
     model_config = {
         "env_prefix": "TRUSTGRAPH_",
         "env_file": ".env",

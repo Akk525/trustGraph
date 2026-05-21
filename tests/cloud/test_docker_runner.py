@@ -468,17 +468,29 @@ class TestWorkerModeDispatch(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Integration — skipped if Docker unavailable
+# Integration — skipped if Docker daemon unavailable
 # ---------------------------------------------------------------------------
 
-@unittest.skipUnless(shutil.which("docker"), "Docker not available")
-class TestDockerIntegration(unittest.TestCase):
-    """Sanity checks that run only when Docker is available on the host."""
+def _docker_daemon_running() -> bool:
+    """Return True only if both the docker binary and daemon are accessible."""
+    if not shutil.which("docker"):
+        return False
+    import subprocess
+    try:
+        result = subprocess.run(["docker", "info"], capture_output=True, timeout=5)
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return False
 
-    def test_docker_binary_reachable(self):
+
+@unittest.skipUnless(_docker_daemon_running(), "Docker daemon not available or not running")
+class TestDockerIntegration(unittest.TestCase):
+    """Sanity checks that run only when the Docker daemon is accessible."""
+
+    def test_docker_daemon_accessible(self):
         import subprocess
         result = subprocess.run(["docker", "info"], capture_output=True, timeout=10)
-        self.assertIsInstance(result.returncode, int)
+        self.assertEqual(result.returncode, 0)
 
 
 if __name__ == "__main__":

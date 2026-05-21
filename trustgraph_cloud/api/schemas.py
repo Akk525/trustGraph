@@ -47,8 +47,12 @@ class AuditJobResponse(BaseModel):
 
 class ArtifactInfo(BaseModel):
     name: str
-    path: str
     size_bytes: int
+    storage_backend: str = "local"
+    path: Optional[str] = None          # local file path (local backend)
+    s3_key: Optional[str] = None        # S3 object key (s3 backend)
+    presigned_url: Optional[str] = None # signed download URL (s3 backend)
+    content_type: Optional[str] = None
 
 
 class ArtifactsResponse(BaseModel):

@@ -31,8 +31,42 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         s.jobs_dir.mkdir(parents=True, exist_ok=True)
 
         job_store = LocalJobStore(s.jobs_dir)
-        artifact_store = LocalArtifactStore(s.jobs_dir)
-        job_queue = LocalJobQueue()
+
+        if s.job_queue == "sqs":
+            if not s.sqs_queue_url:
+                raise RuntimeError(
+                    "TRUSTGRAPH_SQS_QUEUE_URL must be set when TRUSTGRAPH_JOB_QUEUE=sqs"
+                )
+            from trustgraph_cloud.jobs.sqs_queue import SQSJobQueue
+            job_queue = SQSJobQueue(
+                queue_url=s.sqs_queue_url,
+                region=s.sqs_region,
+                visibility_timeout=s.sqs_visibility_timeout_seconds,
+                wait_time_seconds=s.sqs_wait_time_seconds,
+                endpoint_url=s.aws_endpoint_url,
+            )
+            logger.info("api.job_queue", extra={"backend": "sqs", "queue_url": s.sqs_queue_url})
+        else:
+            job_queue = LocalJobQueue()
+            logger.info("api.job_queue", extra={"backend": "local"})
+
+        if s.artifact_store == "s3":
+            if not s.s3_bucket:
+                raise RuntimeError(
+                    "TRUSTGRAPH_S3_BUCKET must be set when TRUSTGRAPH_ARTIFACT_STORE=s3"
+                )
+            from trustgraph_cloud.artifacts.s3_store import S3ArtifactStore
+            artifact_store = S3ArtifactStore(
+                bucket=s.s3_bucket,
+                prefix=s.s3_prefix,
+                region=s.aws_region,
+                presigned_url_ttl=s.s3_presigned_url_ttl_seconds,
+                endpoint_url=s.aws_endpoint_url,
+            )
+            logger.info("api.artifact_store", extra={"backend": "s3", "bucket": s.s3_bucket})
+        else:
+            artifact_store = LocalArtifactStore(s.jobs_dir)
+            logger.info("api.artifact_store", extra={"backend": "local"})
         worker = Worker(
             queue=job_queue,
             job_store=job_store,
