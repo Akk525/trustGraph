@@ -11,6 +11,7 @@ from trustgraph_cloud.jobs.models import FindingsSummary, JobOptions, JobStatus
 class AuditRequest(BaseModel):
     source_path: Optional[str] = None
     use_demo: bool = False
+    input_s3_key: Optional[str] = None
     generate_test: bool = True
     run_foundry: bool = False
     report_format: str = "both"
@@ -18,10 +19,15 @@ class AuditRequest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_source(self) -> "AuditRequest":
-        if self.use_demo and self.source_path:
-            raise ValueError("Provide source_path or use_demo, not both")
-        if not self.use_demo and not self.source_path:
-            raise ValueError("Provide either source_path or set use_demo=true")
+        provided = sum([
+            bool(self.use_demo),
+            bool(self.source_path),
+            bool(self.input_s3_key),
+        ])
+        if provided > 1:
+            raise ValueError("Provide exactly one of: use_demo, source_path, or input_s3_key")
+        if provided == 0:
+            raise ValueError("Provide one of: use_demo, source_path, or input_s3_key")
         return self
 
     def to_job_options(self) -> JobOptions:
@@ -42,7 +48,17 @@ class AuditJobResponse(BaseModel):
     input_type: str
     findings_summary: Optional[FindingsSummary] = None
     artifact_names: list[str] = []
+    artifact_count: int = 0
     error_message: Optional[str] = None
+
+
+class AuditListResponse(BaseModel):
+    jobs: list[AuditJobResponse]
+    total: Optional[int] = None       # None in DynamoDB cursor mode
+    limit: int
+    offset: Optional[int] = None      # None in cursor mode
+    has_more: bool
+    next_cursor: Optional[str] = None  # opaque base64url; present when has_more
 
 
 class ArtifactInfo(BaseModel):
@@ -64,3 +80,61 @@ class HealthResponse(BaseModel):
     status: str
     queue_depth: int
     version: str = "0.1.0"
+
+
+class PresignedUploadRequest(BaseModel):
+    filename: str
+    content_type: str = "application/zip"
+
+
+class PresignedUploadResponse(BaseModel):
+    upload_url: str
+    input_s3_key: str
+    expires_in: int
+
+
+# ---------------------------------------------------------------------------
+# Phase 3B — Auth schemas
+# ---------------------------------------------------------------------------
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class UserResponse(BaseModel):
+    user_id: str
+    email: str
+    created_at: datetime
+
+
+class CreateApiKeyRequest(BaseModel):
+    name: str
+
+
+class ApiKeyCreatedResponse(BaseModel):
+    key_id: str
+    name: str
+    key_prefix: str
+    raw_key: str        # returned exactly once; not stored
+    created_at: datetime
+
+
+class ApiKeyResponse(BaseModel):
+    key_id: str
+    name: str
+    key_prefix: str
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None

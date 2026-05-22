@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from typing import Any, Optional
 
 from trustgraph_cloud.artifacts.store import ArtifactStore
 from trustgraph_cloud.config import Settings
@@ -37,11 +38,13 @@ class Worker:
         job_store: JobStore,
         artifact_store: ArtifactStore,
         settings: Settings,
+        s3_input_store: Optional[Any] = None,  # S3InputStore | None
     ) -> None:
         self._queue = queue
         self._job_store = job_store
         self._artifact_store = artifact_store
         self._settings = settings
+        self._s3_input_store = s3_input_store
         self._executor = ThreadPoolExecutor(
             max_workers=settings.max_concurrent_workers,
             thread_name_prefix="tg-worker",
@@ -102,6 +105,8 @@ class Worker:
                 options=job.options,
                 artifact_store=self._artifact_store,
                 demo_source_path=self._settings.demo_source_path,
+                input_s3_key=job.input_s3_key,
+                s3_input_store=self._s3_input_store,
             )
 
         try:

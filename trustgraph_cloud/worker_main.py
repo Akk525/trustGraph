@@ -82,6 +82,16 @@ async def _run() -> None:
             "warning": "job status not visible to API; set TRUSTGRAPH_JOB_STORE=dynamodb",
         })
 
+    # -- S3 input store (Phase 3A) ------------------------------------------------
+    from trustgraph_cloud.artifacts.s3_input_store import S3InputStore
+    s3_input_store = S3InputStore(
+        bucket=s.s3_bucket,
+        prefix=s.input_s3_prefix,
+        region=s.aws_region,
+        upload_ttl=s.upload_url_ttl_seconds,
+        endpoint_url=s.aws_endpoint_url,
+    )
+
     # -- Worker -------------------------------------------------------------------
     from trustgraph_cloud.jobs.worker import Worker
     worker = Worker(
@@ -89,6 +99,7 @@ async def _run() -> None:
         job_store=job_store,
         artifact_store=artifact_store,
         settings=s,
+        s3_input_store=s3_input_store,
     )
 
     loop = asyncio.get_running_loop()

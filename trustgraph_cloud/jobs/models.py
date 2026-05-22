@@ -37,8 +37,10 @@ class Job(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    input_type: str                      # "demo" | "local_path"
-    source_path: Optional[str] = None   # populated for local_path
+    input_type: str                        # "demo" | "local_path" | "s3_upload"
+    source_path: Optional[str] = None     # populated for local_path
+    input_s3_key: Optional[str] = None    # populated for s3_upload
+    user_id: Optional[str] = None         # None when auth_required=false (dev mode)
     options: JobOptions = Field(default_factory=JobOptions)
     error_message: Optional[str] = None
     artifact_names: list[str] = Field(default_factory=list)

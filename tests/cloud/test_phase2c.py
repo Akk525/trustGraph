@@ -45,10 +45,34 @@ TABLE_NAME = "test-trustgraph-jobs"
 
 
 def _create_table(client):
+    """Create the jobs table with Phase 4A GSIs (matches production schema)."""
     client.create_table(
         TableName=TABLE_NAME,
         KeySchema=[{"AttributeName": "job_id", "KeyType": "HASH"}],
-        AttributeDefinitions=[{"AttributeName": "job_id", "AttributeType": "S"}],
+        AttributeDefinitions=[
+            {"AttributeName": "job_id",     "AttributeType": "S"},
+            {"AttributeName": "user_id",    "AttributeType": "S"},
+            {"AttributeName": "created_at", "AttributeType": "S"},
+            {"AttributeName": "status",     "AttributeType": "S"},
+        ],
+        GlobalSecondaryIndexes=[
+            {
+                "IndexName": "user_id-created_at-index",
+                "KeySchema": [
+                    {"AttributeName": "user_id",    "KeyType": "HASH"},
+                    {"AttributeName": "created_at", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+            {
+                "IndexName": "status-created_at-index",
+                "KeySchema": [
+                    {"AttributeName": "status",     "KeyType": "HASH"},
+                    {"AttributeName": "created_at", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+        ],
         BillingMode="PAY_PER_REQUEST",
     )
 
@@ -246,16 +270,19 @@ class TestCDKStack(unittest.TestCase):
         self.template.resource_count_is("AWS::S3::Bucket", 1)
 
     def test_has_dynamodb_table(self):
-        self.template.resource_count_is("AWS::DynamoDB::Table", 1)
+        # Phase 2D added auth tables: jobs + users + api-keys = 3
+        self.template.resource_count_is("AWS::DynamoDB::Table", 3)
 
     def test_has_ecs_cluster(self):
         self.template.resource_count_is("AWS::ECS::Cluster", 1)
 
     def test_has_fargate_task_definition(self):
-        self.template.resource_count_is("AWS::ECS::TaskDefinition", 1)
+        # Phase 2D added API task definition: worker + api = 2
+        self.template.resource_count_is("AWS::ECS::TaskDefinition", 2)
 
     def test_has_fargate_service(self):
-        self.template.resource_count_is("AWS::ECS::Service", 1)
+        # Phase 2D added API service: worker + api = 2
+        self.template.resource_count_is("AWS::ECS::Service", 2)
 
     def test_task_definition_references_worker_image(self):
         self.template.has_resource_properties(

@@ -61,6 +61,46 @@ class Settings(BaseSettings):
     # Set TRUSTGRAPH_DEMO_SOURCE_PATH=/build/examples/vulnerable-crosschain/src in ECS.
     demo_source_path: Optional[str] = None
 
+    # Phase 3B — Authentication
+    # Set auth_required=true in production. False means all endpoints are open
+    # (backward-compatible with Phase 1/2 local dev and existing tests).
+    auth_required: bool = False
+    # Secret used to sign JWTs.  Must be set (and kept stable) in production so
+    # tokens survive API restarts.  When empty, a random secret is generated at
+    # startup — only suitable for dev/testing with auth_required=true.
+    jwt_secret: str = ""
+    jwt_ttl_seconds: int = 86400   # 24 h
+    # Auth store backend: "local" (in-memory, dev/tests) | "dynamodb" (production)
+    auth_store: str = "local"
+    users_table: str = "trustgraph-users"
+    api_keys_table: str = "trustgraph-api-keys"
+
+    # Phase 3A — S3 input uploads
+    # S3 key prefix for user-uploaded project ZIPs.  Must be different from s3_prefix
+    # (artifact store) so IAM policies and lifecycle rules can target each independently.
+    input_s3_prefix: str = "trustgraph/inputs"
+    # TTL for presigned PUT URLs (seconds).  900 s = 15 min — generous for large ZIPs.
+    upload_url_ttl_seconds: int = 900
+    # Hard limits applied by safe_extract() before the worker touches the archive.
+    max_zip_files: int = 1000
+    max_zip_bytes: int = 50_000_000  # 50 MB uncompressed
+
+    # Phase 3C — Per-user quotas and in-process rate limiting
+    max_audits_per_day: int = 20    # total audits a user may create in a UTC day
+    max_active_jobs: int = 3        # max concurrent queued+running jobs per user
+    # Requests per minute to allow from a single IP on auth endpoints.
+    # Phase 4: move to Redis, API Gateway usage plans, or AWS WAF rate rules.
+    auth_rate_limit_per_minute: int = 10
+
+    # Phase 5C — CORS
+    # Comma-separated list of allowed browser origins. Empty = CORS middleware
+    # is not added at all (safe default for API-only / backend deployments).
+    # Example: "https://myapp.vercel.app,http://localhost:3000"
+    cors_origins: str = ""
+    # Allow credentials (cookies). Keep False for Bearer-token auth — the
+    # Authorization header is always allowed when cors_origins is configured.
+    cors_allow_credentials: bool = False
+
     model_config = {
         "env_prefix": "TRUSTGRAPH_",
         "env_file": ".env",

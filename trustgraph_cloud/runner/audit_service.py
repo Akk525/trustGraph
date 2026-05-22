@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from trustgraph.graph import run_workflow
 from trustgraph.models import RiskLevel
 from trustgraph_cloud.artifacts.store import ArtifactStore
 from trustgraph_cloud.jobs.models import FindingsSummary, JobOptions
 from trustgraph_cloud.logging import logger
+from trustgraph_cloud.runner.zip_extractor import ZipSlipError, ZipTooLargeError, safe_extract
 
 # Candidate paths for the bundled demo contracts, checked in order.
 # The explicit TRUSTGRAPH_DEMO_SOURCE_PATH setting is prepended at call time.
@@ -34,6 +35,8 @@ def run_audit(
     options: JobOptions,
     artifact_store: ArtifactStore,
     demo_source_path: Optional[str] = None,
+    input_s3_key: Optional[str] = None,
+    s3_input_store: Optional[Any] = None,  # S3InputStore | None
 ) -> tuple[FindingsSummary, list[str]]:
     """
     Execute a TrustGraph analysis job inside an isolated workspace.
@@ -86,6 +89,39 @@ def run_audit(
             shutil.copy2(src, dest)
         scan_path = str(dest)
         logger.info("audit.copied_source", extra={"job_id": job_id, "scan_path": scan_path})
+
+    elif input_type == "s3_upload":
+        if not input_s3_key:
+            raise AuditServiceError("input_s3_key is required for s3_upload input")
+        if s3_input_store is None:
+            raise AuditServiceError("S3 input store is not configured; cannot process s3_upload jobs")
+
+        input_dir = workspace / "input"
+        input_dir.mkdir(parents=True, exist_ok=True)
+
+        # Derive a safe local filename from the S3 key (last path segment)
+        zip_filename = Path(input_s3_key).name or "upload.zip"
+        zip_path = input_dir / zip_filename
+
+        try:
+            s3_input_store.download(input_s3_key, zip_path)
+        except Exception as exc:
+            raise AuditServiceError(f"Failed to download input from S3: {exc}") from exc
+
+        extract_dir = input_dir / "extracted"
+        try:
+            safe_extract(zip_path, extract_dir)
+        except (ZipSlipError, ZipTooLargeError) as exc:
+            raise AuditServiceError(f"ZIP validation failed: {exc}") from exc
+        except Exception as exc:
+            raise AuditServiceError(f"ZIP extraction failed: {exc}") from exc
+
+        scan_path = str(extract_dir)
+        logger.info("audit.s3_upload_extracted", extra={
+            "job_id": job_id,
+            "s3_key": input_s3_key,
+            "scan_path": scan_path,
+        })
 
     else:
         raise AuditServiceError(f"Unknown input_type: {input_type!r}")
